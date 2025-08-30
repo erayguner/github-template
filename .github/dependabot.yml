@@ -1,0 +1,202 @@
+# Dependabot configuration for automated dependency updates
+# 2025 Best Practices: Enhanced security, grouped updates, multi-ecosystem support
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+
+version: 2
+updates:
+  # Enable version updates for npm (if package.json exists)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "npm"
+      include: "scope"
+    reviewers:
+      - "erayguner"  # Replace with actual GitHub username
+    assignees:
+      - "erayguner"  # Replace with actual GitHub username
+    labels:
+      - "dependencies"
+      - "npm"
+    allow:
+      # Allow updates for all dependencies
+      - dependency-type: "all"
+    ignore:
+      # Ignore major version updates for stability
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+
+  # Enable version updates for pip (Python)
+  - package-ecosystem: "pip"
+    directory: "/python"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "deps(python)"
+      prefix-development: "deps-dev(python)"
+      include: "scope"
+    reviewers:
+      - "erayguner"  # Replace with actual GitHub username
+    assignees:
+      - "erayguner"  # Replace with actual GitHub username
+    labels:
+      - "dependencies"
+      - "python"
+      - "security"  # 2025: Always tag for security tracking
+    allow:
+      - dependency-type: "all"
+    # Group minor and patch updates to reduce PR noise
+    groups:
+      python-dependencies:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "pytest*"
+          - "mypy*"
+          - "ruff*"
+        update-types:
+          - "minor"
+          - "patch"
+      python-testing:
+        patterns:
+          - "pytest*"
+          - "coverage*"
+          - "factory-boy*"
+          - "faker*"
+        update-types:
+          - "minor"
+          - "patch"
+      python-linting:
+        patterns:
+          - "ruff*"
+          - "mypy*"
+          - "bandit*"
+          - "safety*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Enable version updates for Terraform
+  - package-ecosystem: "terraform"
+    directory: "/terraform"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "deps(terraform)"
+      include: "scope"
+    reviewers:
+      - "erayguner"
+    assignees:
+      - "erayguner"
+    labels:
+      - "dependencies"
+      - "terraform"
+      - "infrastructure"
+      - "security"  # 2025: Always tag for security tracking
+    allow:
+      - dependency-type: "all"
+
+  # Enable version updates for Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "wednesday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "docker"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "thursday"
+      time: "04:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 5
+    pull-request-branch-name:
+      separator: "/"
+    commit-message:
+      prefix: "deps(actions)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "ci-cd"
+      - "security"  # 2025: Always tag for security tracking
+    allow:
+      - dependency-type: "all"
+
+# 2025 Security Enhancements
+enable-beta-ecosystems: true
+
+# Vulnerability alerts configuration
+vulnerability-alerts:
+  # Automatically create PRs for security vulnerabilities
+  enabled: true
+
+# Grouped updates (reduces PR noise)
+groups:
+  # Group all production dependencies together
+  production-dependencies:
+    applies-to: version-updates
+    patterns:
+      - "*"
+    exclude-patterns:
+      - "*test*"
+      - "*dev*"
+      - "*lint*"
+      - "*format*"
+    update-types:
+      - "minor"
+      - "patch"
+
+  # Group all development dependencies together  
+  development-dependencies:
+    applies-to: version-updates
+    patterns:
+      - "*test*"
+      - "*dev*"
+      - "*lint*"
+      - "*format*"
+      - "pytest*"
+      - "black*"
+      - "ruff*"
+      - "mypy*"
+    update-types:
+      - "minor"
+      - "patch"
+
+  # Group security updates separately for immediate attention
+  security-updates:
+    applies-to: security-updates
+    patterns:
+      - "*"

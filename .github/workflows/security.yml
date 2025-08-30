@@ -1,0 +1,214 @@
+name: Security Analysis
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run security scans daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # CodeQL Analysis for SAST
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-and-quality
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+  # Dependency Review
+  dependency-review:
+    name: Dependency Review
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: moderate
+          allow-licenses: MIT, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC
+
+  # Secret Scanning
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: TruffleHog OSS
+        uses: trufflesecurity/trufflehog@v3.85.0
+        with:
+          path: ./
+          base: main
+          head: HEAD
+          extra_args: --debug --only-verified
+
+  # SLSA Provenance Generation
+  provenance:
+    name: Generate SLSA Provenance
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      id-token: write
+      contents: write
+    outputs:
+      attestation-name: ${{ steps.attest.outputs.bundle-path }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate SLSA Provenance
+        uses: actions/attest-build-provenance@v1
+        id: attest
+        with:
+          subject-path: |
+            ./terraform/**
+            ./python/**
+            ./.github/**
+
+  # SBOM Generation
+  sbom:
+    name: Generate SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.17.6
+        with:
+          path: ./
+          format: spdx-json
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: ./sbom.spdx.json
+
+  # License Compliance
+  license-check:
+    name: License Compliance
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Check Python licenses
+        if: hashFiles('**/pyproject.toml') != ''
+        working-directory: ./python
+        run: |
+          # Install dependencies and license checker
+          uv sync --group dev
+          uv tool install pip-licenses
+          uv tool install licensecheck
+          
+          # Check licenses
+          uv run pip-licenses --format=json --output-file=python-licenses.json
+          uv tool run licensecheck --zero
+
+      - name: Upload license report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: license-compliance
+          path: |
+            python-licenses.json
+
+  # Container Security (if Dockerfile exists)
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    if: hashFiles('**/Dockerfile') != ''
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Build Docker image
+        run: |
+          docker build -t test-image:latest .
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'test-image:latest'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Supply Chain Security Summary
+  security-summary:
+    name: Security Summary
+    needs: [codeql, dependency-review, secret-scanning, provenance, sbom, license-check]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Security Summary
+        run: |
+          echo "## 🔒 Security Analysis Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**CodeQL Analysis:** ${{ needs.codeql.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dependency Review:** ${{ needs.dependency-review.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Secret Scanning:** ${{ needs.secret-scanning.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SLSA Provenance:** ${{ needs.provenance.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**SBOM Generation:** ${{ needs.sbom.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "**License Check:** ${{ needs.license-check.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🛡️ Security Features Enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Static Application Security Testing (SAST)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Dependency vulnerability scanning" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Secret detection and prevention" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Software Bill of Materials (SBOM)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ SLSA Build Provenance" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ License compliance checking" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Container vulnerability scanning" >> $GITHUB_STEP_SUMMARY

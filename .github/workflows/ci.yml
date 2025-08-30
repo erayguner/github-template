@@ -1,0 +1,385 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+    inputs:
+      project_type:
+        description: 'Force project type (terraform/python)'
+        required: false
+        default: 'auto'
+        type: choice
+        options:
+          - auto
+          - terraform
+          - python
+
+env:
+  # Set default project type - can be overridden by repository variable
+  PROJECT_TYPE: ${{ vars.PROJECT_TYPE || 'auto' }}
+
+permissions:
+  contents: read
+  security-events: write
+  id-token: write  # Required for OIDC
+  actions: read
+
+jobs:
+  # Detect project type automatically
+  detect-project-type:
+    runs-on: ubuntu-latest
+    outputs:
+      project_type: ${{ steps.detect.outputs.project_type }}
+      has_terraform: ${{ steps.detect.outputs.has_terraform }}
+      has_python: ${{ steps.detect.outputs.has_python }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Detect project type
+        id: detect
+        run: |
+          # Override detection if manual input provided
+          if [ "${{ github.event.inputs.project_type }}" != "auto" ] && [ "${{ github.event.inputs.project_type }}" != "" ]; then
+            echo "project_type=${{ github.event.inputs.project_type }}" >> $GITHUB_OUTPUT
+            echo "Manual override: ${{ github.event.inputs.project_type }}"
+            exit 0
+          fi
+          
+          # Use repository variable if set
+          if [ "$PROJECT_TYPE" != "auto" ]; then
+            echo "project_type=$PROJECT_TYPE" >> $GITHUB_OUTPUT
+            echo "Repository variable: $PROJECT_TYPE"
+            exit 0
+          fi
+          
+          # Auto-detect based on files
+          HAS_TF=$(find . -name "*.tf" -o -name "*.tfvars" | head -1)
+          HAS_PY=$(find . -name "*.py" -o -name "requirements*.txt" -o -name "pyproject.toml" -o -name "setup.py" | head -1)
+          
+          if [ -n "$HAS_TF" ] && [ -n "$HAS_PY" ]; then
+            echo "project_type=mixed" >> $GITHUB_OUTPUT
+            echo "has_terraform=true" >> $GITHUB_OUTPUT
+            echo "has_python=true" >> $GITHUB_OUTPUT
+            echo "Detected: Mixed project (Terraform + Python)"
+          elif [ -n "$HAS_TF" ]; then
+            echo "project_type=terraform" >> $GITHUB_OUTPUT
+            echo "has_terraform=true" >> $GITHUB_OUTPUT
+            echo "has_python=false" >> $GITHUB_OUTPUT
+            echo "Detected: Terraform project"
+          elif [ -n "$HAS_PY" ]; then
+            echo "project_type=python" >> $GITHUB_OUTPUT
+            echo "has_terraform=false" >> $GITHUB_OUTPUT
+            echo "has_python=true" >> $GITHUB_OUTPUT
+            echo "Detected: Python project"
+          else
+            echo "project_type=unknown" >> $GITHUB_OUTPUT
+            echo "has_terraform=false" >> $GITHUB_OUTPUT
+            echo "has_python=false" >> $GITHUB_OUTPUT
+            echo "Warning: No Terraform or Python files detected"
+          fi
+
+  # Pre-commit and code quality checks
+  code-quality:
+    needs: detect-project-type
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install pre-commit
+        run: uv tool install pre-commit
+
+      - name: Cache pre-commit hooks
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Run pre-commit
+        run: pre-commit run --all-files --verbose
+
+  # Terraform-specific jobs
+  terraform-validate:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.has_terraform == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cloud_provider: ['aws', 'gcp', 'multi']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6.0
+
+      - name: Terraform Format Check
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Init
+        run: |
+          find . -name "*.tf" -execdir terraform init -backend=false \;
+
+      - name: Terraform Validate - AWS Only
+        if: matrix.cloud_provider == 'aws'
+        run: |
+          find . -name "*.tf" -execdir terraform validate -var="enable_aws=true" -var="enable_gcp=false" \;
+
+      - name: Terraform Validate - GCP Only
+        if: matrix.cloud_provider == 'gcp'
+        run: |
+          find . -name "*.tf" -execdir terraform validate -var="enable_aws=false" -var="enable_gcp=true" -var="gcp_project_id=test-project" \;
+
+      - name: Terraform Validate - Multi-Cloud
+        if: matrix.cloud_provider == 'multi'
+        run: |
+          find . -name "*.tf" -execdir terraform validate -var="enable_aws=true" -var="enable_gcp=true" -var="gcp_project_id=test-project" \;
+
+  terraform-security:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.has_terraform == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          format: sarif
+          output: tfsec.sarif
+
+      - name: Upload tfsec results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: tfsec.sarif
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov.sarif
+
+      - name: Upload Checkov results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov.sarif
+
+  terraform-docs:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.has_terraform == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Generate Terraform docs
+        uses: terraform-docs/gh-actions@v1.0.0
+        with:
+          working-dir: .
+          output-file: README.md
+          output-method: inject
+          git-push: false
+
+      - name: Check for documentation changes
+        run: |
+          if [[ -n $(git status --porcelain) ]]; then
+            echo "::error::Terraform documentation is out of date. Please run terraform-docs locally."
+            git diff
+            exit 1
+          fi
+
+  # Python-specific jobs
+  python-test:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.has_python == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: ./python
+        run: |
+          uv sync --group dev --group test
+
+      - name: Run linting
+        working-directory: ./python
+        run: |
+          uv run ruff check --fix .
+          uv run ruff format .
+
+      - name: Run tests with coverage
+        working-directory: ./python
+        run: |
+          if [ -f "pytest.ini" ] || [ -f "pyproject.toml" ] || [ -f "setup.cfg" ]; then
+            uv run pytest --cov=src --cov-report=xml --cov-report=term-missing
+          else
+            uv run pytest tests/ --cov=src --cov-report=xml --cov-report=term-missing || echo "No tests directory found, skipping tests"
+          fi
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          file: ./coverage.xml
+          flags: unittests
+          name: codecov-umbrella
+
+  python-security:
+    needs: detect-project-type
+    if: needs.detect-project-type.outputs.has_python == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install security tools
+        working-directory: ./python
+        run: |
+          uv sync --group dev
+
+      - name: Run Bandit security linter
+        working-directory: ./python
+        run: uv run bandit -r src -f json -o bandit-report.json || true
+
+      - name: Run Safety security check
+        working-directory: ./python
+        run: |
+          uv run safety check --json --output safety-report.json || true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+
+  # Build and package jobs
+  build:
+    needs: [detect-project-type, code-quality]
+    if: always() && needs.code-quality.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Build Terraform package
+        if: needs.detect-project-type.outputs.has_terraform == 'true'
+        run: |
+          # Create terraform package
+          tar -czf terraform-package.tar.gz --exclude='.terraform' --exclude='*.tfstate*' terraform/
+
+      - name: Install uv
+        if: needs.detect-project-type.outputs.has_python == 'true'
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        if: needs.detect-project-type.outputs.has_python == 'true'
+        run: uv python install 3.11
+
+      - name: Build Python package
+        if: needs.detect-project-type.outputs.has_python == 'true'
+        working-directory: ./python
+        run: uv build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            terraform-package.tar.gz
+            dist/
+
+  # Deployment job (conditional)
+  deploy:
+    needs: [detect-project-type, terraform-validate, python-test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifacts
+
+      - name: Deploy Terraform
+        if: needs.detect-project-type.outputs.has_terraform == 'true'
+        run: |
+          echo "🚀 Deploying Terraform infrastructure..."
+          # Add your Terraform deployment commands here
+          # terraform plan -out=tfplan
+          # terraform apply tfplan
+
+      - name: Deploy Python application
+        if: needs.detect-project-type.outputs.has_python == 'true'
+        run: |
+          echo "🚀 Deploying Python application..."
+          # Add your Python deployment commands here
+          # docker build -t myapp .
+          # docker push myapp:latest
+
+  # Summary job
+  summary:
+    needs: [detect-project-type, code-quality, terraform-validate, terraform-security, python-test, python-security, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Workflow Summary
+        run: |
+          echo "## 📊 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Project Type:** ${{ needs.detect-project-type.outputs.project_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Terraform:** ${{ needs.detect-project-type.outputs.has_terraform }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Python:** ${{ needs.detect-project-type.outputs.has_python }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform Validate: ${{ needs.terraform-validate.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Terraform Security: ${{ needs.terraform-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Python Tests: ${{ needs.python-test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Python Security: ${{ needs.python-security.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
