@@ -26,6 +26,8 @@ permissions:
   security-events: write
   id-token: write  # Required for OIDC
   actions: read
+  attestations: write  # Required for SLSA provenance
+  packages: write  # Required for package publishing
 
 jobs:
   # Detect project type automatically
@@ -322,6 +324,13 @@ jobs:
         if: needs.detect-project-type.outputs.has_python == 'true'
         working-directory: ./python
         run: uv build
+
+      - name: Generate SLSA provenance for build artifacts
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: |
+            terraform-package.tar.gz
+            dist/**/*
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4

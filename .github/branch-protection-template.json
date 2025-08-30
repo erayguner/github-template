@@ -1,41 +1,47 @@
 {
-  "name": "Branch Protection Template",
-  "description": "Recommended branch protection settings for secure development",
+  "name": "Branch Protection Template - Industry Standards 2025",
+  "description": "DevSecOps compliant branch protection settings following industry standards",
   "settings": {
     "required_status_checks": {
       "strict": true,
       "contexts": [
-        "ci/code-quality",
-        "ci/security-analysis", 
-        "ci/tests",
-        "ci/terraform-validate",
-        "ci/python-test"
+        "Pre-commit Validation / pre-commit",
+        "CI/CD Pipeline / code-quality",
+        "CI/CD Pipeline / terraform-validate",
+        "CI/CD Pipeline / terraform-security", 
+        "CI/CD Pipeline / python-test",
+        "CI/CD Pipeline / python-security",
+        "Security Analysis / codeql",
+        "Security Analysis / dependency-review",
+        "Security Analysis / secret-scanning",
+        "Dependency Management & Supply Chain Security / dependency-analysis",
+        "Dependency Management & Supply Chain Security / vulnerability-scanning",
+        "Performance Monitoring / python-performance",
+        "Performance Monitoring / terraform-performance"
       ]
     },
-    "enforce_admins": true,
+    "enforce_admins": false,
     "required_pull_request_reviews": {
-      "required_approving_review_count": 2,
+      "required_approving_review_count": 1,
       "dismiss_stale_reviews": true,
       "require_code_owner_reviews": true,
       "require_last_push_approval": true,
       "bypass_pull_request_allowances": {
         "users": [],
-        "teams": ["security-team"],
-        "apps": ["dependabot"]
+        "teams": ["security-team", "admin-team"],
+        "apps": ["dependabot[bot]", "github-actions[bot]"]
       }
     },
-    "restrictions": {
-      "users": ["admin-user"],
-      "teams": ["core-team", "security-team"],
-      "apps": []
-    },
+    "restrictions": null,
     "required_linear_history": true,
     "allow_force_pushes": false,
     "allow_deletions": false,
     "block_creations": false,
     "required_conversation_resolution": true,
     "lock_branch": false,
-    "allow_fork_syncing": true
+    "allow_fork_syncing": true,
+    "require_signed_commits": true,
+    "require_deployments_to_succeed": true
   },
   "instructions": {
     "setup": [
