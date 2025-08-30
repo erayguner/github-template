@@ -9,7 +9,7 @@ terraform {
   #   key    = "terraform.tfstate"
   #   region = "us-west-2"
   # }
-  
+
   # GCP Cloud Storage Backend
   # backend "gcs" {
   #   bucket = "your-terraform-state-bucket"
@@ -59,14 +59,14 @@ locals {
     aws = var.enable_aws
     gcp = var.enable_gcp
   }
-  
+
   # Common tags/labels for resources
   common_tags = {
     Environment = var.environment
     Project     = var.project_name
     ManagedBy   = "Terraform"
   }
-  
+
   common_labels = {
     environment = var.environment
     project     = var.project_name

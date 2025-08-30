@@ -17,7 +17,7 @@ variable "cloud_provider" {
   description = "Primary cloud provider (aws, gcp, or multi)"
   type        = string
   default     = "aws"
-  
+
   validation {
     condition     = contains(["aws", "gcp", "multi"], var.cloud_provider)
     error_message = "Cloud provider must be one of: aws, gcp, multi."
@@ -64,7 +64,7 @@ variable "gcp_project_id" {
   default     = ""
 
   validation {
-    condition = var.enable_gcp == false || (var.enable_gcp == true && length(var.gcp_project_id) > 0)
+    condition     = var.enable_gcp == false || (var.enable_gcp == true && length(var.gcp_project_id) > 0)
     error_message = "GCP project ID is required when enable_gcp is true."
   }
 }
