@@ -317,6 +317,8 @@ logs/
 # ===========================
 
 # Add your project-specific ignores here
-# examples/
-# temp/
-# local-config/
+.claude/
+claude*
+CLAUDE.md
+
+ruv-swarm*
