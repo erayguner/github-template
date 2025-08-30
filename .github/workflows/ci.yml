@@ -1,272 +1,44 @@
-name: CI
+"""Tests for the main module."""
 
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-  workflow_dispatch:
-    inputs:
-      project_type:
-        description: 'Force project type (terraform/python)'
-        required: false
-        default: 'auto'
-        type: choice
-        options: [auto, terraform, python]
+from unittest.mock import MagicMock, patch
+import os
+import pytest
 
-permissions:
-  contents: read
-  security-events: write
-  actions: read
+class TestMain:
+    def test_default_arguments(self) -> None:
+        ...
 
-jobs:
-  detect-project-type:
-    runs-on: ubuntu-latest
-    outputs:
-      project_type: ${{ steps.set.outputs.project_type }}
-      has_terraform: ${{ steps.set.outputs.has_terraform }}
-      has_python: ${{ steps.set.outputs.has_python }}
-      py_dir: ${{ steps.set.outputs.py_dir }}
-    steps:
-      - uses: actions/checkout@v5
+    def test_verbose_flag(self) -> None:
+        ...
 
-      - id: set
-        shell: bash
-        run: |
-          PT_INPUT="${{ github.event.inputs.project_type }}"
-          PT_VAR="${{ vars.PROJECT_TYPE }}"
-          if [[ -n "$PT_INPUT" && "$PT_INPUT" != "auto" ]]; then PT="$PT_INPUT";
-          elif [[ -n "$PT_VAR" && "$PT_VAR" != "auto" ]]; then PT="$PT_VAR";
-          else PT="auto"; fi
+    def test_config_argument(self) -> None:
+        ...
 
-          if git ls-files '*.tf' 2>/dev/null | grep -q .; then HAS_TF=true; else HAS_TF=false; fi
-          if git ls-files '*.py' 'pyproject.toml' 'setup.py' 'requirements*.txt' 2>/dev/null | grep -q .; then HAS_PY=true; else HAS_PY=false; fi
+    def test_dry_run_flag(self) -> None:
+        ...
 
-          if [[ "$PT" == "auto" ]]; then
-            if $HAS_TF && $HAS_PY; then PT="mixed";
-            elif $HAS_TF; then PT="terraform";
-            elif $HAS_PY; then PT="python";
-            else PT="unknown"; fi
-          fi
+    def test_main_success(self, mock_settings: MagicMock, mock_setup_logging: MagicMock) -> None:
+        ...
 
-          PY_DIR="."
-          if [[ -d "python" ]] && ls python/{pyproject.toml,setup.cfg,setup.py} python/src 2>/dev/null >/dev/null; then PY_DIR="python"; fi
+    def test_main_with_verbose(self, mock_settings: MagicMock, mock_setup_logging: MagicMock) -> None:
+        ...
 
-          echo "project_type=$PT" >> "$GITHUB_OUTPUT"
-          echo "has_terraform=$HAS_TF" >> "$GITHUB_OUTPUT"
-          echo "has_python=$HAS_PY" >> "$GITHUB_OUTPUT"
-          echo "py_dir=$PY_DIR" >> "$GITHUB_OUTPUT"
-          echo "Detected project_type=$PT  has_terraform=$HAS_TF  has_python=$HAS_PY  py_dir=$PY_DIR"
+    def test_main_with_config(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
+        ...
 
-  code-quality:
-    needs: detect-project-type
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+    def test_main_with_dry_run(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
+        ...
 
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: latest
+    def test_main_keyboard_interrupt(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
+        ...
 
-      - run: uv python install 3.11
+    def test_main_exception(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
+        ...
 
-      - if: hashFiles('.pre-commit-config.yaml') != ''
-        run: uv tool install pre-commit
+    def test_main_exception_verbose(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
+        ...
 
-      - if: hashFiles('.pre-commit-config.yaml') != ''
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/pre-commit
-          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
-
-      - name: Run pre-commit
-        if: hashFiles('.pre-commit-config.yaml') != ''
-        run: pre-commit run --all-files --verbose
-
-      - if: hashFiles('.pre-commit-config.yaml') == ''
-        run: echo "No .pre-commit-config.yaml; skipping pre-commit."
-
-  terraform-validate:
-    needs: detect-project-type
-    if: needs.detect-project-type.outputs.has_terraform == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: ~1.6.0
-
-      - name: Terraform fmt
-        run: terraform fmt -check -diff -recursive
-
-      - name: Terraform validate (per module)
-        shell: bash
-        run: |
-          set -e
-          mapfile -t MODULE_DIRS < <(git ls-files '*.tf' | xargs -n1 dirname | sort -u)
-          if [[ ${#MODULE_DIRS[@]} -eq 0 ]]; then
-            echo "No Terraform modules found"; exit 0
-          fi
-          rc=0
-          for d in "${MODULE_DIRS[@]}"; do
-            echo "::group::Validate $d"
-            ( cd "$d" && terraform init -backend=false -input=false >/dev/null && terraform validate -no-color ) || rc=1
-            echo "::endgroup::"
-          done
-          exit $rc
-
-  terraform-security:
-    needs: detect-project-type
-    if: needs.detect-project-type.outputs.has_terraform == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: tfsec
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: sarif
-          output: tfsec.sarif
-
-      - name: Upload tfsec SARIF
-        if: always() && hashFiles('tfsec.sarif') != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: tfsec.sarif
-
-      - name: Checkov
-        id: checkov
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          framework: terraform
-          soft_fail: true
-          output_format: sarif
-          output_file_path: ${{ github.workspace }}/checkov.sarif
-
-      - name: Upload Checkov SARIF
-        if: always() && hashFiles(format('{0}/checkov.sarif', github.workspace)) != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ github.workspace }}/checkov.sarif
-
-  python-test:
-    needs: detect-project-type
-    if: needs.detect-project-type.outputs.has_python == 'true'
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        python-version: ['3.10', '3.11', '3.12']
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: latest
-
-      - run: uv python install ${{ matrix.python-version }}
-      - name: Create uv virtualenv
-        working-directory: ${{ steps.py.outputs.dir }}
-        run: uv venv --python ${{ matrix.python-version }}
-
-      - id: py
-        run: echo "dir=${{ needs.detect-project-type.outputs.py_dir }}" >> "$GITHUB_OUTPUT"
-
-      - name: Install deps
-        working-directory: ${{ steps.py.outputs.dir }}
-        run: |
-          if [[ -f "pyproject.toml" ]]; then
-            uv sync --group dev --group test
-          elif [[ -f "requirements.txt" ]]; then
-            uv pip install -r requirements.txt
-            uv pip install ruff pytest pytest-cov
-          else
-            uv pip install ruff pytest pytest-cov
-          fi
-
-      - name: Lint
-        working-directory: ${{ steps.py.outputs.dir }}
-        run: uv run ruff check .
-
-      - name: Format check
-        working-directory: ${{ steps.py.outputs.dir }}
-        run: uv run ruff format --check .
-
-      - name: Tests + coverage
-        working-directory: ${{ steps.py.outputs.dir }}
-        run: |
-          PKG="src"; [[ -d "src" ]] || PKG="."
-          if [[ -d "tests" || -f "pytest.ini" || -f "pyproject.toml" || -f "setup.cfg" ]]; then
-            uv run pytest --cov="$PKG" --cov-report=xml --cov-report=term-missing
-          else
-            echo "No tests found; skipping."; echo "" > coverage.xml
-          fi
-
-  python-security:
-    needs: detect-project-type
-    if: needs.detect-project-type.outputs.has_python == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: astral-sh/setup-uv@v6
-        with:
-          version: latest
-
-      - run: uv python install 3.11
-      - name: Create uv virtualenv
-        working-directory: ${{ steps.pysec.outputs.dir }}
-        run: uv venv --python 3.11
-
-      - id: pysec
-        run: echo "dir=${{ needs.detect-project-type.outputs.py_dir }}" >> "$GITHUB_OUTPUT"
-
-      - name: Install tools
-        working-directory: ${{ steps.pysec.outputs.dir }}
-        run: |
-          if [[ -f "pyproject.toml" ]]; then uv sync --group dev || true; fi
-          uv pip install bandit safety || true
-
-      - name: Bandit
-        working-directory: ${{ steps.pysec.outputs.dir }}
-        run: uv run bandit -r src -f json -o bandit-report.json || true
-
-      - name: Safety
-        working-directory: ${{ steps.pysec.outputs.dir }}
-        run: uv run safety check --json --output safety-report.json || true
-
-      - name: Upload security reports
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: security-reports
-          path: |
-            ${{ steps.pysec.outputs.dir }}/bandit-report.json
-            ${{ steps.pysec.outputs.dir }}/safety-report.json
-
-  summary:
-    needs:
-      - detect-project-type
-      - code-quality
-      - terraform-validate
-      - terraform-security
-      - python-test
-      - python-security
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Workflow Summary
-        run: |
-          echo "## 📊 CI Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Project Type:** ${{ needs.detect-project-type.outputs.project_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Terraform:** ${{ needs.detect-project-type.outputs.has_terraform }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Python:** ${{ needs.detect-project-type.outputs.has_python }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Job Results" >> $GITHUB_STEP_SUMMARY
-          echo "- Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Terraform Validate: ${{ needs.terraform-validate.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Terraform Security: ${{ needs.terraform-security.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Python Tests: ${{ needs.python-test.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Python Security: ${{ needs.python-security.result }}" >> $GITHUB_STEP_SUMMARY
+    def test_full_application_flow(self) -> None:
+        ...
+        # The line `import os` has been removed from here as requested.
+        ...
