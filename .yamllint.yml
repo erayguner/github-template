@@ -1,0 +1,33 @@
+extends: default
+
+rules:
+  # Line length for CI/CD files can be longer
+  line-length:
+    max: 120
+    level: warning
+
+  # Allow multiple documents in YAML files
+  document-start: disable
+
+  # More flexible indentation for GitHub Actions
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow truthy values in GitHub Actions
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+    check-keys: true
+
+  # Allow comments for documentation
+  comments:
+    min-spaces-from-content: 1
+
+  # Flexible brackets for complex expressions
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+
+  # GitHub Actions specific allowances
+  key-duplicates: disable  # GitHub Actions allows duplicate keys in some contexts
