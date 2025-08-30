@@ -3,31 +3,3 @@
 
 # Global owners (fallback for all files)
 * @erayguner
-
-# Security-sensitive files require security team review
-/.github/workflows/ @erayguner @security-team
-/SECURITY.md @erayguner @security-team
-/.secrets.baseline @erayguner @security-team
-
-# Infrastructure and deployment files
-/terraform/ @erayguner @devops-team
-/.github/branch-protection-template.json @erayguner @devops-team
-/.github/dependabot.yml @erayguner @devops-team
-
-# Python application code
-/python/ @erayguner @backend-team
-/python/src/ @erayguner @backend-team
-/python/tests/ @erayguner @backend-team @qa-team
-
-# Documentation requires technical writing review
-/*.md @erayguner @docs-team
-/docs/ @erayguner @docs-team
-
-# CI/CD and automation
-/.github/workflows/ @erayguner @devops-team @security-team
-/.pre-commit-config.yaml @erayguner @devops-team
-
-# Configuration files
-*.toml @erayguner @backend-team
-*.ini @erayguner @backend-team
-*.cfg @erayguner @backend-team
