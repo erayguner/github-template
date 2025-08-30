@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
@@ -17,13 +17,8 @@ on:
 permissions:
   contents: read
   security-events: write
-  id-token: write         # for OIDC / provenance
   actions: read
-  attestations: write     # for SLSA provenance
-  packages: write
 
-# NOTE: GitHub expressions don't support JS-style string coalescing.
-# We set PROJECT_TYPE via a step output instead of env-level defaulting.
 jobs:
   detect-project-type:
     runs-on: ubuntu-latest
@@ -33,82 +28,52 @@ jobs:
       has_python: ${{ steps.set.outputs.has_python }}
       py_dir: ${{ steps.set.outputs.py_dir }}
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Detect & normalise settings
-        id: set
+      - id: set
         shell: bash
         run: |
-          # 1) Resolve PROJECT_TYPE precedence: workflow input > repo var > auto
           PT_INPUT="${{ github.event.inputs.project_type }}"
           PT_VAR="${{ vars.PROJECT_TYPE }}"
-          if [[ -n "$PT_INPUT" && "$PT_INPUT" != "auto" ]]; then
-            PT="$PT_INPUT"
-            echo "Using manual input: $PT"
-          elif [[ -n "$PT_VAR" && "$PT_VAR" != "auto" ]]; then
-            PT="$PT_VAR"
-            echo "Using repo var: $PT"
-          else
-            PT="auto"
-            echo "Using auto-detect"
-          fi
+          if [[ -n "$PT_INPUT" && "$PT_INPUT" != "auto" ]]; then PT="$PT_INPUT";
+          elif [[ -n "$PT_VAR" && "$PT_VAR" != "auto" ]]; then PT="$PT_VAR";
+          else PT="auto"; fi
 
-          # 2) Detect language presence
-          HAS_TF=""
-          HAS_PY=""
-          # Terraform: any *.tf present
-          if git ls-files '*.tf' 2>/dev/null | grep -q .; then HAS_TF="true"; else HAS_TF="false"; fi
-          # Python: common indicators
-          if git ls-files '*.py' 'pyproject.toml' 'setup.py' 'requirements*.txt' 2>/dev/null | grep -q .; then HAS_PY="true"; else HAS_PY="false"; fi
+          if git ls-files '*.tf' 2>/dev/null | grep -q .; then HAS_TF=true; else HAS_TF=false; fi
+          if git ls-files '*.py' 'pyproject.toml' 'setup.py' 'requirements*.txt' 2>/dev/null | grep -q .; then HAS_PY=true; else HAS_PY=false; fi
 
-          # 3) If auto, set derived project type
           if [[ "$PT" == "auto" ]]; then
-            if [[ "$HAS_TF" == "true" && "$HAS_PY" == "true" ]]; then
-              PT="mixed"
-            elif [[ "$HAS_TF" == "true" ]]; then
-              PT="terraform"
-            elif [[ "$HAS_PY" == "true" ]]; then
-              PT="python"
-            else
-              PT="unknown"
-            fi
+            if $HAS_TF && $HAS_PY; then PT="mixed";
+            elif $HAS_TF; then PT="terraform";
+            elif $HAS_PY; then PT="python";
+            else PT="unknown"; fi
           fi
 
-          # 4) Locate Python project directory (root or ./python)
           PY_DIR="."
-          if [[ -d "python" ]] && [[ -f "python/pyproject.toml" || -f "python/setup.cfg" || -f "python/setup.py" || -d "python/src" ]]; then
-            PY_DIR="python"
-          fi
+          if [[ -d "python" ]] && ls python/{pyproject.toml,setup.cfg,setup.py} python/src 2>/dev/null >/dev/null; then PY_DIR="python"; fi
 
           echo "project_type=$PT" >> "$GITHUB_OUTPUT"
           echo "has_terraform=$HAS_TF" >> "$GITHUB_OUTPUT"
           echo "has_python=$HAS_PY" >> "$GITHUB_OUTPUT"
           echo "py_dir=$PY_DIR" >> "$GITHUB_OUTPUT"
-
           echo "Detected project_type=$PT  has_terraform=$HAS_TF  has_python=$HAS_PY  py_dir=$PY_DIR"
 
   code-quality:
     needs: detect-project-type
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           version: latest
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - run: uv python install 3.11
 
-      - name: Install pre-commit (if configured)
-        if: hashFiles('.pre-commit-config.yaml') != ''
+      - if: hashFiles('.pre-commit-config.yaml') != ''
         run: uv tool install pre-commit
 
-      - name: Cache pre-commit hooks
-        if: hashFiles('.pre-commit-config.yaml') != ''
+      - if: hashFiles('.pre-commit-config.yaml') != ''
         uses: actions/cache@v4
         with:
           path: ~/.cache/pre-commit
@@ -118,8 +83,7 @@ jobs:
         if: hashFiles('.pre-commit-config.yaml') != ''
         run: pre-commit run --all-files --verbose
 
-      - name: Skip note
-        if: hashFiles('.pre-commit-config.yaml') == ''
+      - if: hashFiles('.pre-commit-config.yaml') == ''
         run: echo "No .pre-commit-config.yaml; skipping pre-commit."
 
   terraform-validate:
@@ -127,18 +91,15 @@ jobs:
     if: needs.detect-project-type.outputs.has_terraform == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ~1.6.0
 
-      - name: Terraform fmt (recursive)
-        run: terraform fmt -check -recursive
+      - name: Terraform fmt
+        run: terraform fmt -check -diff -recursive
 
-      # Validate each module directory once (not once per *.tf file)
       - name: Terraform validate (per module)
         shell: bash
         run: |
@@ -160,10 +121,9 @@ jobs:
     if: needs.detect-project-type.outputs.has_terraform == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Run tfsec
+      - name: tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           format: sarif
@@ -175,54 +135,20 @@ jobs:
         with:
           sarif_file: tfsec.sarif
 
-      - name: Run Checkov
+      - name: Checkov
         id: checkov
         uses: bridgecrewio/checkov-action@v12
         with:
           framework: terraform
-          soft_fail: true                   # avoid failing the job on findings
+          soft_fail: true
           output_format: sarif
           output_file_path: ${{ github.workspace }}/checkov.sarif
 
-      - name: Verify Checkov SARIF presence (debug)
-        run: |
-          ls -l $GITHUB_WORKSPACE || true
-          if [ -f "$GITHUB_WORKSPACE/checkov.sarif" ]; then
-            echo "Found SARIF at $GITHUB_WORKSPACE/checkov.sarif"
-          else
-            echo "No SARIF produced by Checkov."
-          fi
-
       - name: Upload Checkov SARIF
-        if: always() && hashFiles(format('{0}', github.workspace) + '/checkov.sarif') != ''
+        if: always() && hashFiles(format('{0}/checkov.sarif', github.workspace)) != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: ${{ github.workspace }}/checkov.sarif
-
-  terraform-docs:
-    needs: detect-project-type
-    if: needs.detect-project-type.outputs.has_terraform == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Generate Terraform docs
-        uses: terraform-docs/gh-actions@v1.0.0
-        with:
-          working-dir: .
-          output-file: README.md
-          output-method: inject
-          git-push: false
-
-      - name: Check for documentation changes
-        shell: bash
-        run: |
-          if [[ -n "$(git status --porcelain)" ]]; then
-            echo "::error::Terraform documentation is out of date. Please run terraform-docs locally."
-            git --no-pager diff
-            exit 1
-          fi
 
   python-test:
     needs: detect-project-type
@@ -233,22 +159,18 @@ jobs:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           version: latest
 
-      - name: Set up Python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
+      - run: uv python install ${{ matrix.python-version }}
 
-      - name: Locate Python project dir
-        id: py
+      - id: py
         run: echo "dir=${{ needs.detect-project-type.outputs.py_dir }}" >> "$GITHUB_OUTPUT"
 
-      - name: Install deps (uv sync)
+      - name: Install deps
         working-directory: ${{ steps.py.outputs.dir }}
         run: |
           if [[ -f "pyproject.toml" ]]; then
@@ -257,61 +179,47 @@ jobs:
             uv pip install -r requirements.txt
             uv pip install ruff pytest pytest-cov
           else
-            echo "No pyproject.toml or requirements.txt found; installing test tooling."
             uv pip install ruff pytest pytest-cov
           fi
 
-      - name: Lint (ruff) + Format (ruff format)
+      - name: Lint
         working-directory: ${{ steps.py.outputs.dir }}
-        run: |
-          uv run ruff check .
-          uv run ruff format --check .
+        run: uv run ruff check .
 
-      - name: Run tests with coverage
+      - name: Format check
+        working-directory: ${{ steps.py.outputs.dir }}
+        run: uv run ruff format --check .
+
+      - name: Tests + coverage
         working-directory: ${{ steps.py.outputs.dir }}
         run: |
-          PKG="src"
-          [[ -d "src" ]] || PKG="."
+          PKG="src"; [[ -d "src" ]] || PKG="."
           if [[ -d "tests" || -f "pytest.ini" || -f "pyproject.toml" || -f "setup.cfg" ]]; then
             uv run pytest --cov="$PKG" --cov-report=xml --cov-report=term-missing
           else
             echo "No tests found; skipping."; echo "" > coverage.xml
           fi
 
-      - name: Upload coverage to Codecov (main Python only)
-        if: matrix.python-version == '3.11'
-        uses: codecov/codecov-action@v4
-        with:
-          file: ${{ steps.py.outputs.dir }}/coverage.xml
-          flags: unittests
-          name: codecov-umbrella
-
   python-security:
     needs: detect-project-type
     if: needs.detect-project-type.outputs.has_python == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
+      - uses: astral-sh/setup-uv@v6
         with:
           version: latest
 
-      - name: Set up Python
-        run: uv python install 3.11
+      - run: uv python install 3.11
 
-      - name: Locate Python project dir
-        id: pysec
+      - id: pysec
         run: echo "dir=${{ needs.detect-project-type.outputs.py_dir }}" >> "$GITHUB_OUTPUT"
 
-      - name: Install security tool deps
+      - name: Install tools
         working-directory: ${{ steps.pysec.outputs.dir }}
         run: |
-          if [[ -f "pyproject.toml" ]]; then
-            uv sync --group dev || true
-          fi
+          if [[ -f "pyproject.toml" ]]; then uv sync --group dev || true; fi
           uv pip install bandit safety || true
 
       - name: Bandit
@@ -331,112 +239,6 @@ jobs:
             ${{ steps.pysec.outputs.dir }}/bandit-report.json
             ${{ steps.pysec.outputs.dir }}/safety-report.json
 
-  build:
-    needs: [detect-project-type, code-quality]
-    if: success() || needs.code-quality.result == 'skipped'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # --- Terraform artefact (optional) ---
-      - name: Build Terraform package
-        if: needs.detect-project-type.outputs.has_terraform == 'true'
-        run: |
-          set -e
-          TAR="terraform-package.tar.gz"
-          # Include only Terraform content; avoid .terraform & state
-          tar -czf "$TAR" \
-            --exclude='.terraform' \
-            --exclude='*.tfstate*' \
-            $(git ls-files '*.tf' '*.tfvars' ':!:**/.terraform/**' | xargs -n1 dirname | sort -u)
-          ls -l "$TAR"
-
-      # --- Python artefact (optional) ---
-      - name: Install uv
-        if: needs.detect-project-type.outputs.has_python == 'true'
-        uses: astral-sh/setup-uv@v5
-        with:
-          version: latest
-
-      - name: Set up Python
-        if: needs.detect-project-type.outputs.has_python == 'true'
-        run: uv python install 3.11
-
-      - name: Locate Python project dir
-        if: needs.detect-project-type.outputs.has_python == 'true'
-        id: pydir
-        run: echo "dir=${{ needs.detect-project-type.outputs.py_dir }}" >> "$GITHUB_OUTPUT"
-
-      - name: Build Python package
-        if: needs.detect-project-type.outputs.has_python == 'true'
-        working-directory: ${{ steps.pydir.outputs.dir }}
-        run: |
-          if [[ -f "pyproject.toml" ]]; then
-            uv build
-          else
-            echo "No pyproject.toml; skipping Python build."
-          fi
-
-      # --- Provenance per artefact (guarded) ---
-      - name: SLSA provenance (Terraform)
-        if: needs.detect-project-type.outputs.has_terraform == 'true'
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: terraform-package.tar.gz
-
-      - name: SLSA provenance (Python dist)
-        if: needs.detect-project-type.outputs.has_python == 'true' && hashFiles(format('{0}/dist/**', steps.pydir.outputs.dir)) != ''
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-path: ${{ steps.pydir.outputs.dir }}/dist/**
-
-      # --- Upload artefacts only if they exist ---
-      - name: Upload Terraform artefact
-        if: needs.detect-project-type.outputs.has_terraform == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: terraform-package
-          path: terraform-package.tar.gz
-
-      - name: Upload Python dist
-        if: needs.detect-project-type.outputs.has_python == 'true' && hashFiles(format('{0}/dist/**', steps.pydir.outputs.dir)) != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: python-dist
-          path: ${{ steps.pydir.outputs.dir }}/dist/
-
-  deploy:
-    needs:
-      - detect-project-type
-      - build
-      # terraform/python jobs may be skipped; do NOT require them explicitly.
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download artefacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-
-      - name: Deploy Terraform
-        if: needs.detect-project-type.outputs.has_terraform == 'true'
-        run: |
-          echo "🚀 Deploying Terraform infrastructure..."
-          ls -l artifacts/terraform-package || true
-          # terraform plan/apply would go here
-
-      - name: Deploy Python application
-        if: needs.detect-project-type.outputs.has_python == 'true'
-        run: |
-          echo "🚀 Deploying Python application..."
-          ls -l artifacts/python-dist || true
-          # docker build/push or platform deploy here
-
   summary:
     needs:
       - detect-project-type
@@ -445,13 +247,12 @@ jobs:
       - terraform-security
       - python-test
       - python-security
-      - build
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Workflow Summary
         run: |
-          echo "## 📊 CI/CD Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 CI Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Project Type:** ${{ needs.detect-project-type.outputs.project_type }}" >> $GITHUB_STEP_SUMMARY
           echo "**Terraform:** ${{ needs.detect-project-type.outputs.has_terraform }}" >> $GITHUB_STEP_SUMMARY
@@ -463,4 +264,3 @@ jobs:
           echo "- Terraform Security: ${{ needs.terraform-security.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Python Tests: ${{ needs.python-test.result }}" >> $GITHUB_STEP_SUMMARY
           echo "- Python Security: ${{ needs.python-security.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Build: ${{ needs.build.result }}" >> $GITHUB_STEP_SUMMARY
