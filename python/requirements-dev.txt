@@ -1,0 +1,11 @@
+# This file is deprecated in favor of pyproject.toml with uv
+# Use: uv add --dev <package-name> to add development dependencies
+# 
+# Migration commands:
+# uv add --dev pytest pytest-cov pytest-mock pytest-asyncio pytest-xvfb
+# uv add --dev factory-boy faker ruff mypy types-requests types-PyYAML
+# uv add --dev bandit[toml] safety sphinx sphinx-rtd-theme sphinx-autodoc-typehints
+# uv add --dev pre-commit coverage[toml] py-spy memory-profiler
+# uv add --dev ipython ipdb rich
+#
+# For optional dependencies, add them to specific groups in pyproject.toml

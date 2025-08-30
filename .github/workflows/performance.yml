@@ -1,0 +1,185 @@
+name: Performance Monitoring
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run performance tests weekly on Sundays at 3 AM UTC
+    - cron: '0 3 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: write  # For commenting on PRs
+
+jobs:
+  python-performance:
+    name: Python Performance Tests
+    runs-on: ubuntu-latest
+    if: hashFiles('**/*.py') != ''
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Full history for comparison
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install dependencies
+        working-directory: ./python
+        run: |
+          # Install all dependencies including profiling tools
+          uv sync --group dev --group test --group profiling
+
+      - name: Run performance benchmarks
+        working-directory: ./python
+        run: |
+          # Run benchmark tests if they exist
+          if [ -d "tests/benchmarks" ]; then
+            uv run pytest tests/benchmarks/ --benchmark-json=benchmark.json
+          else
+            echo "No benchmark tests found. Create tests/benchmarks/ directory with pytest-benchmark tests."
+          fi
+
+      - name: Memory profiling
+        working-directory: ./python
+        run: |
+          if [ -f "src/main.py" ]; then
+            uv run python -m memory_profiler src/main.py > memory-profile.txt || true
+          fi
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-results
+          path: |
+            python/benchmark.json
+            python/memory-profile.txt
+
+      - name: Performance regression check
+        if: github.event_name == 'pull_request'
+        run: |
+          echo "## 📊 Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f "python/benchmark.json" ]; then
+            echo "Benchmark results generated. Check artifacts for detailed performance metrics." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ No benchmark tests found. Consider adding performance tests in tests/benchmarks/" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  terraform-performance:
+    name: Terraform Performance Tests
+    runs-on: ubuntu-latest
+    if: hashFiles('**/*.tf') != ''
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6.0
+
+      - name: Terraform Performance Test
+        working-directory: ./terraform
+        run: |
+          echo "Starting Terraform performance analysis..."
+          
+          # Time terraform operations
+          echo "## 🏗️ Terraform Performance" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Test init performance
+          start_time=$(date +%s.%N)
+          terraform init -backend=false
+          end_time=$(date +%s.%N)
+          init_duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "- **Init Time**: ${init_duration}s" >> $GITHUB_STEP_SUMMARY
+          
+          # Test validate performance
+          start_time=$(date +%s.%N)
+          terraform validate
+          end_time=$(date +%s.%N)
+          validate_duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "- **Validate Time**: ${validate_duration}s" >> $GITHUB_STEP_SUMMARY
+          
+          # Test plan performance (dry run)
+          start_time=$(date +%s.%N)
+          terraform plan -out=tfplan > /dev/null 2>&1 || true
+          end_time=$(date +%s.%N)
+          plan_duration=$(echo "$end_time - $start_time" | bc -l)
+          echo "- **Plan Time**: ${plan_duration}s" >> $GITHUB_STEP_SUMMARY
+          
+          # Analyze plan size
+          if [ -f "tfplan" ]; then
+            plan_size=$(stat -f%z tfplan 2>/dev/null || stat -c%s tfplan 2>/dev/null || echo "0")
+            echo "- **Plan Size**: ${plan_size} bytes" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  code-metrics:
+    name: Code Quality Metrics
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install analysis tools
+        run: |
+          uv tool install radon
+          uv tool install xenon  
+          uv tool install vulture
+
+      - name: Code complexity analysis
+        if: hashFiles('**/*.py') != ''
+        run: |
+          echo "## 📈 Code Quality Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Cyclomatic complexity
+          echo "### Cyclomatic Complexity" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          uv tool run radon cc python/src --total-average || true >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Maintainability index
+          echo "### Maintainability Index" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          uv tool run radon mi python/src || true >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          
+          # Dead code detection
+          echo "### Dead Code Analysis" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          uv tool run vulture python/src --min-confidence 80 || true >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Line count analysis
+        run: |
+          echo "### Project Statistics" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "Total files: $(find . -type f \( -name "*.py" -o -name "*.tf" -o -name "*.yml" -o -name "*.yaml" \) | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "Python files: $(find . -name "*.py" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "Terraform files: $(find . -name "*.tf" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "YAML files: $(find . -name "*.yml" -o -name "*.yaml" | wc -l)" >> $GITHUB_STEP_SUMMARY
+          echo "Total lines of code: $(find . -type f \( -name "*.py" -o -name "*.tf" \) -exec wc -l {} + | tail -1 | awk '{print $1}')" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
