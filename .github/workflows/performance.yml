@@ -1,14 +1,10 @@
-name: Performance Monitoring
+name: Performance Check
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  schedule:
-    # Run performance tests weekly on Sundays at 3 AM UTC
-    - cron: '0 3 * * 0'
-  workflow_dispatch:
 
 permissions:
   contents: read

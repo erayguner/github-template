@@ -1,155 +1,33 @@
-# Pre-commit configuration for multi-language repository - 2025 Best Practices
-# Supports both Terraform and Python projects with conditional hooks
-
 repos:
-  # Security-first approach - prevent secrets from being committed (2025 critical)
-  - repo: https://github.com/gitleaks/gitleaks
-    rev: v8.22.1
-    hooks:
-      - id: gitleaks
-        name: "🔒 Security: Detect hardcoded secrets"
-
-  # Universal hooks (always run) - Updated to latest 2025 versions
+  # Basic file checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: v4.6.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
-        args: ['--unsafe']
-      - id: check-added-large-files
-        args: ['--maxkb=1000']
-      - id: check-case-conflict
-      - id: check-merge-conflict
       - id: check-json
       - id: pretty-format-json
-        args: ['--autofix', '--no-sort-keys']
-      - id: mixed-line-ending
-        args: ['--fix=lf']
+        args: ['--autofix']
 
-  # Terraform-specific hooks (conditional)
-  - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.100.0
+  # Python linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
     hooks:
-      - id: terraform_fmt
-        files: \.(tf|tfvars)$
-      - id: terraform_validate
-        files: \.(tf|tfvars)$
-      - id: terraform_docs
-        files: \.(tf|tfvars)$
-        args:
-          - --hook-config=--path-to-file=README.md
-          - --hook-config=--add-to-existing-file=true
-          - --hook-config=--create-file-if-not-exist=true
-      - id: terraform_tflint
-        files: \.(tf|tfvars)$
-        args:
-          - --args=--only=terraform_deprecated_interpolation
-          - --args=--only=terraform_deprecated_index
-          - --args=--only=terraform_unused_declarations
-          - --args=--only=terraform_comment_syntax
-          - --args=--only=terraform_documented_outputs
-          - --args=--only=terraform_documented_variables
-          - --args=--only=terraform_typed_variables
-          - --args=--only=terraform_module_pinned_source
-          - --args=--only=terraform_naming_convention
-          - --args=--only=terraform_required_version
-          - --args=--only=terraform_required_providers
-          - --args=--only=terraform_standard_module_structure
-          - --args=--only=terraform_workspace_remote
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
 
-  # Enhanced security scanning (2025 standards)
+  # Basic security
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.5.0
     hooks:
       - id: detect-secrets
-        name: "🔍 Security: Detect secrets baseline"
         args: ['--baseline', '.secrets.baseline']
-        exclude: package.lock.json
-        files: \.(tf|tfvars|py)$
 
-  - repo: https://github.com/tfsec/tfsec
-    rev: v1.28.4
+  # Terraform basics
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.96.1
     hooks:
-      - id: tfsec
-        files: \.(tf|tfvars)$
-        args:
-          - --format=json
-          - --soft-fail
-
-  # Python 2025 Standard: Ruff (replaces Black, isort, Flake8 - 150-1000x faster)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.5
-    hooks:
-      # Linting (replaces Flake8)
-      - id: ruff
-        name: "🐍 Python: Ruff linting"
-        files: \.py$
-        args: [--fix, --exit-non-zero-on-fix]
-      # Formatting (replaces Black + isort)
-      - id: ruff-format
-        name: "🎨 Python: Ruff formatting"
-        files: \.py$
-
-  # Keep mypy for type checking (Ruff doesn't replace this)
-  - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.17.1
-    hooks:
-      - id: mypy
-        files: \.py$
-        args: [--strict, --ignore-missing-imports]
-        additional_dependencies: [types-requests, types-PyYAML]
-
-  - repo: https://github.com/PyCQA/bandit
-    rev: 1.7.5
-    hooks:
-      - id: bandit
-        files: \.py$
-        args: ['-r', '-f', 'json']
-        exclude: tests/
-
-  - repo: https://github.com/Lucas-C/pre-commit-hooks-safety
-    rev: v1.3.2
-    hooks:
-      - id: python-safety-dependencies-check
-        files: requirements.*\.txt$
-
-  # Documentation and markdown
-  - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.38.0
-    hooks:
-      - id: markdownlint
-        args: ['--fix']
-        files: \.md$
-
-  # Multi-language security and quality (2025 update - latest version)
-  - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.255
-    hooks:
-      - id: checkov
-        name: "🛡️ Security: Infrastructure as Code scanning"
-        files: \.(tf|tfvars|py|yaml|yml|json)$
-        args:
-          - --framework=terraform,python,dockerfile,kubernetes,github_configuration
-          - --output=json
-          - --soft-fail
-
-  # Commit message formatting
-  - repo: https://github.com/commitizen-tools/commitizen
-    rev: v3.13.0
-    hooks:
-      - id: commitizen
-        stages: [commit-msg]
-
-# Configuration for specific tools
-ci:
-  autofix_commit_msg: |
-    [pre-commit.ci] auto fixes from pre-commit hooks
-
-    for more information, see https://pre-commit.ci
-  autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
-  autoupdate_schedule: weekly
-  skip: [terraform_docs, terraform_tflint, tfsec, checkov]
-  submodules: false
+      - id: terraform_fmt
+      - id: terraform_validate

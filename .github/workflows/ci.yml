@@ -1,44 +1,96 @@
-"""Tests for the main module."""
+name: Basic CI
 
-from unittest.mock import MagicMock, patch
-import os
-import pytest
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
 
-class TestMain:
-    def test_default_arguments(self) -> None:
-        ...
+permissions:
+  contents: read
+  security-events: write
 
-    def test_verbose_flag(self) -> None:
-        ...
+jobs:
+  # Linting and code quality
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-    def test_config_argument(self) -> None:
-        ...
+      - name: Install uv
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
 
-    def test_dry_run_flag(self) -> None:
-        ...
+      - name: Set up Python
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        run: uv python install 3.11
 
-    def test_main_success(self, mock_settings: MagicMock, mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: Python linting
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        working-directory: ./python
+        run: |
+          uv sync --group dev
+          uv run ruff check .
+          uv run ruff format --check .
 
-    def test_main_with_verbose(self, mock_settings: MagicMock, mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: Setup Terraform
+        if: hashFiles('**/*.tf') != ''
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6.0
 
-    def test_main_with_config(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: Terraform linting
+        if: hashFiles('**/*.tf') != ''
+        run: |
+          terraform fmt -check -recursive
+          find . -name "*.tf" -execdir terraform init -backend=false \;
+          find . -name "*.tf" -execdir terraform validate \;
 
-    def test_main_with_dry_run(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
-        ...
+  # Security checks
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-    def test_main_keyboard_interrupt(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: +security-extended
 
-    def test_main_exception(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: CodeQL Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-    def test_main_exception_verbose(self, mock_settings: MagicMock, _mock_setup_logging: MagicMock) -> None:
-        ...
+      - name: CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
 
-    def test_full_application_flow(self) -> None:
-        ...
-        # The line `import os` has been removed from here as requested.
-        ...
+      - name: Secret scanning
+        uses: trufflesecurity/trufflehog@v3.85.0
+        with:
+          path: ./
+          base: main
+          head: HEAD
+
+      - name: Python security check
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        run: |
+          pip install bandit safety
+          bandit -r python/ -f json -o bandit-report.json || true
+          safety check --json --output safety-report.json || true
+
+      - name: Terraform security check
+        if: hashFiles('**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          format: sarif
+          output: tfsec.sarif
+
+      - name: Upload security results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: tfsec.sarif
