@@ -1,12 +1,12 @@
 # broken_comprehensive_example.py
 
 # --- Syntax Error ---
-def greet(name)
+def greet(name):
     return f"Hello, {name}"
 
 
 # --- Import Error ---
-import non_existent_module  # Commented out non-existent module
+# import non_existent_module  # Commented out non-existent module
 
 
 # --- Runtime Error ---
