@@ -43,7 +43,7 @@ resource "google_compute_firewall" "allow_http" {
     ports    = ["80", "443"]
   }
 
-  source_ranges = [var.vpc_cidr]  # Only allow from within VPC
+  source_ranges = [var.vpc_cidr] # Only allow from within VPC
   target_tags   = ["web-server"]
 
   description = "Allow HTTP and HTTPS traffic from VPC only"
@@ -60,7 +60,7 @@ resource "google_compute_firewall" "allow_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = [var.vpc_cidr]  # Only allow SSH from within VPC
+  source_ranges = [var.vpc_cidr] # Only allow SSH from within VPC
   target_tags   = ["ssh-access"]
 
   description = "Allow SSH access from VPC only"

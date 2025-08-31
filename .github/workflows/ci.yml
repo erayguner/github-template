@@ -44,10 +44,11 @@ jobs:
 
       - name: Terraform linting
         if: hashFiles('**/*.tf') != ''
+        working-directory: ./terraform
         run: |
-          terraform fmt -check -recursive
-          find . -name "*.tf" -execdir terraform init -backend=false \;
-          find . -name "*.tf" -execdir terraform validate \;
+          terraform fmt -check -recursive .
+          terraform init -backend=false
+          terraform validate
 
   # Security checks
   security:
@@ -56,17 +57,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: CodeQL Analysis
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: python
           queries: +security-extended
 
-      - name: CodeQL Autobuild
+      - name: Autobuild
         uses: github/codeql-action/autobuild@v3
 
-      - name: CodeQL Analysis
+      - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
 
       - name: Secret scanning
         uses: trufflesecurity/trufflehog@v3.85.0
@@ -89,8 +92,9 @@ jobs:
           format: sarif
           output: tfsec.sarif
 
-      - name: Upload security results
+      - name: Upload SARIF file
         uses: github/codeql-action/upload-sarif@v3
         if: hashFiles('**/*.tf') != ''
         with:
           sarif_file: tfsec.sarif
+          category: "terraform-security"

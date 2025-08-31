@@ -42,8 +42,8 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count = var.enable_aws ? 1 : 0
 
   name              = "/aws/vpc/${var.project_name}-flow-logs"
-  retention_in_days = 7  # Keep costs low for template
-  kms_key_id        = aws_kms_key.logs[0].arn  # Encrypt logs
+  retention_in_days = 7                       # Keep costs low for template
+  kms_key_id        = aws_kms_key.logs[0].arn # Encrypt logs
 
   tags = {
     Name = "${var.project_name}-vpc-flow-logs"
@@ -106,7 +106,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
   availability_zone       = data.aws_availability_zones.available[0].names[count.index]
-  map_public_ip_on_launch = false  # Security: Don't auto-assign public IPs
+  map_public_ip_on_launch = false # Security: Don't auto-assign public IPs
 
   tags = {
     Name = "${var.project_name}-public-${count.index + 1}"
@@ -163,7 +163,7 @@ resource "aws_security_group" "web" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]  # Only allow from within VPC
+    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
   }
 
   # Allow HTTPS only from trusted networks
@@ -172,7 +172,7 @@ resource "aws_security_group" "web" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]  # Only allow from within VPC
+    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
   }
 
   # Restrict egress to VPC only - add specific rules as needed
@@ -196,8 +196,8 @@ resource "aws_kms_key" "logs" {
   count = var.enable_aws ? 1 : 0
 
   description             = "KMS key for CloudWatch Logs encryption"
-  deletion_window_in_days = 7  # Shorter window for template
-  enable_key_rotation     = true  # Enable automatic key rotation
+  deletion_window_in_days = 7    # Shorter window for template
+  enable_key_rotation     = true # Enable automatic key rotation
 
   tags = {
     Name = "${var.project_name}-logs-key"
