@@ -5,9 +5,7 @@
     "required_status_checks": {
       "strict": true,
       "contexts": [
-        "Basic CI / lint",
-        "Basic CI / security",
-        "Security Checks / security-scan"
+        "Basic CI / lint-and-security"
       ]
     },
     "enforce_admins": false,

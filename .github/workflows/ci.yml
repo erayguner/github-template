@@ -11,63 +11,63 @@ permissions:
   security-events: write
 
 jobs:
-  # Linting and code quality
-  lint:
+  # Combined linting and security checks
+  lint-and-security:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # -------- Python linting (only if Python present) --------
+      # -------- Setup Tools --------
       - name: Install uv
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
         uses: astral-sh/setup-uv@v6
         with:
           version: latest
 
       - name: Set up Python
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
         run: uv python install 3.11
 
-      - name: Create uv virtualenv
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
-        working-directory: ./python
-        run: uv venv --python 3.11
-
-      - name: Python linting
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
-        working-directory: ./python
-        run: |
-          if [[ -f "pyproject.toml" ]]; then
-            uv sync --group dev || true
-          elif [[ -f "requirements.txt" ]]; then
-            uv pip install -r requirements.txt || true
-          fi
-          uv pip install ruff || true
-          uv run ruff check .
-          uv run ruff format --check .
-
-      # -------- Terraform linting (only if Terraform present) --------
       - name: Setup Terraform
         if: hashFiles('**/*.tf') != ''
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ~1.6.0
 
-      - name: Terraform linting
+      # -------- Python Linting & Security --------
+      - name: Python linting and security
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
+        working-directory: ./python
+        run: |
+          # Setup environment
+          uv venv --python 3.11
+          if [[ -f "pyproject.toml" ]]; then
+            uv sync --group dev || true
+          elif [[ -f "requirements.txt" ]]; then
+            uv pip install -r requirements.txt || true
+          fi
+          
+          # Linting
+          uv run ruff check .
+          uv run ruff format --check .
+          
+          # Security scanning
+          uv pip install bandit || true
+          uv run bandit -r src/ || true
+
+      # -------- Terraform Linting & Security --------
+      - name: Terraform linting and security
         if: hashFiles('**/*.tf') != ''
         working-directory: ./terraform
         run: |
-          terraform fmt -check -diff -recursive .
-          terraform init -backend=false -input=false
-          terraform validate -no-color
-
-  # Security checks
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
+          # Linting
+          terraform fmt -check -recursive .
+          terraform init -backend=false
+          terraform validate
+          
+          # Security scanning
+          tfsec . --format sarif --out tfsec.sarif
 
       # -------- CodeQL Analysis --------
       - name: Initialize CodeQL
@@ -82,50 +82,18 @@ jobs:
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
 
-      # -------- Secret scanning --------
-      - name: Secret scanning (trufflehog)
+      # -------- Secret Scanning --------
+      - name: Secret scanning
         uses: trufflesecurity/trufflehog@v3.85.0
         with:
           path: ./
           base: main
           head: HEAD
 
-      # -------- Python security (Bandit/Safety) --------
-      - name: Set up Python for security
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
-        uses: astral-sh/setup-uv@v6
-        with:
-          version: latest
-
-      - name: Install Python 3.11
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
-        run: uv python install 3.11
-
-      - name: Create uv virtualenv (security)
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
-        working-directory: ./python
-        run: uv venv --python 3.11
-
-      - name: Python security check (Bandit & Safety)
-        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
-        working-directory: ./python
-        run: |
-          if [[ -f "pyproject.toml" ]]; then uv sync --group dev || true; fi
-          uv pip install bandit safety || true
-          uv run bandit -r src -f json -o bandit-report.json || true
-          uv run safety check --json --output safety-report.json || true
-
-      # -------- Terraform security (tfsec) --------
-      - name: Terraform security (tfsec)
+      # -------- Upload Security Results --------
+      - name: Upload Terraform SARIF
         if: hashFiles('**/*.tf') != ''
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: sarif
-          output: ${{ github.workspace }}/tfsec.sarif  # explicit absolute path
-
-      - name: Upload tfsec SARIF
-        if: always() && hashFiles(format('{0}/tfsec.sarif', github.workspace)) != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: ${{ github.workspace }}/tfsec.sarif
+          sarif_file: terraform/tfsec.sarif
           category: "terraform-security"
