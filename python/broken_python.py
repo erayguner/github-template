@@ -1,7 +1,7 @@
 # broken_comprehensive_example.py
 
 # --- Syntax Error ---
-def greet(name):  # Fixed colon
+def greet(name):
     return f"Hello, {name}"
 
 
@@ -11,6 +11,7 @@ def greet(name):  # Fixed colon
 
 # --- Runtime Error ---
 def divide(a, b):
+
     return a / b
 
 

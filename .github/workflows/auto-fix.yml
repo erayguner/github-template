@@ -132,7 +132,7 @@ jobs:
           ref: ${{ steps.pick.outputs.head_ref }}
           fetch-depth: 0
           persist-credentials: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup git identity
         run: |
@@ -455,6 +455,14 @@ jobs:
           
           git commit -m "$COMMIT_MSG"
           
+          # Configure git with PAT if available to trigger workflows
+          if [ -n "${{ secrets.PAT_TOKEN }}" ]; then
+            git config --global url."https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
+            echo "✅ Configured git with PAT to trigger workflows"
+          else
+            echo "⚠️  Using GITHUB_TOKEN - new workflows may not trigger"
+          fi
+          
           # Push with retry logic
           for i in $(seq 1 ${{ env.MAX_RETRY_ATTEMPTS }}); do
             if git push -u origin "${{ steps.branch.outputs.branch }}"; then
@@ -474,6 +482,33 @@ jobs:
           done
           
           echo "::endgroup::"
+
+      - name: Trigger CI re-run (if PAT available)
+        if: steps.claude.outcome == 'success' && secrets.PAT_TOKEN != ''
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.PAT_TOKEN }}
+          script: |
+            // Try to re-run the original failed workflow
+            const workflowId = "${{ github.event.workflow_run.workflow_id || 'ci.yml' }}";
+            const ref = "${{ steps.pick.outputs.head_ref }}";
+            
+            try {
+              // Dispatch the CI workflow on the target branch
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: workflowId,
+                ref: ref
+              });
+              
+              console.log(`✅ Triggered workflow ${workflowId} on branch ${ref}`);
+              
+            } catch (error) {
+              console.log(`⚠️ Could not trigger workflow: ${error.message}`);
+              console.log('Workflows will trigger automatically on push if PAT has correct permissions');
+            }
 
       - name: Comment on original PR (direct push)
         if: |
@@ -495,7 +530,7 @@ jobs:
             - Corrected import statements and function definitions
             - Applied minimal fixes to resolve CI failures
             
-            The CI will re-run automatically. If issues persist, manual intervention may be required.
+            The CI will re-run automatically. If workflows don't trigger, configure a PAT_TOKEN secret with workflow permissions. If issues persist, manual intervention may be required.
             
             <details>
             <summary>Workflow Details</summary>
