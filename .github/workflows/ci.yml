@@ -18,24 +18,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # -------- Python linting (only if Python present) --------
       - name: Install uv
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
-        uses: astral-sh/setup-uv@v5
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
+        uses: astral-sh/setup-uv@v6
         with:
-          version: "latest"
+          version: latest
 
       - name: Set up Python
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
         run: uv python install 3.11
 
+      - name: Create uv virtualenv
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
+        working-directory: ./python
+        run: uv venv --python 3.11
+
       - name: Python linting
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', '**/*.py') != ''
         working-directory: ./python
         run: |
-          uv sync --group dev
+          if [[ -f "pyproject.toml" ]]; then
+            uv sync --group dev || true
+          elif [[ -f "requirements.txt" ]]; then
+            uv pip install -r requirements.txt || true
+          fi
+          uv pip install ruff || true
           uv run ruff check .
           uv run ruff format --check .
 
+      # -------- Terraform linting (only if Terraform present) --------
       - name: Setup Terraform
         if: hashFiles('**/*.tf') != ''
         uses: hashicorp/setup-terraform@v3
@@ -46,9 +58,9 @@ jobs:
         if: hashFiles('**/*.tf') != ''
         working-directory: ./terraform
         run: |
-          terraform fmt -check -recursive .
-          terraform init -backend=false
-          terraform validate
+          terraform fmt -check -diff -recursive .
+          terraform init -backend=false -input=false
+          terraform validate -no-color
 
   # Security checks
   security:
@@ -57,44 +69,68 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Initialize CodeQL
+      # -------- CodeQL (Python only; skip if no Python) --------
+      - name: Initialize CodeQL (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/init@v3
         with:
           languages: python
+          # Point CodeQL to typical src layout (adjust if needed)
+          source-root: ./python
           queries: +security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      # For Python, no autobuild is required
 
-      - name: Perform CodeQL Analysis
+      - name: Perform CodeQL Analysis (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:python"
 
-      - name: Secret scanning
+      # -------- Secret scanning --------
+      - name: Secret scanning (trufflehog)
         uses: trufflesecurity/trufflehog@v3.85.0
         with:
           path: ./
           base: main
           head: HEAD
 
-      - name: Python security check
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
-        run: |
-          pip install bandit safety
-          bandit -r python/ -f json -o bandit-report.json || true
-          safety check --json --output safety-report.json || true
+      # -------- Python security (Bandit/Safety) --------
+      - name: Set up Python for security
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
 
-      - name: Terraform security check
+      - name: Install Python 3.11
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
+        run: uv python install 3.11
+
+      - name: Create uv virtualenv (security)
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
+        working-directory: ./python
+        run: uv venv --python 3.11
+
+      - name: Python security check (Bandit & Safety)
+        if: hashFiles('python/pyproject.toml', 'python/requirements*.txt', 'python/**/*.py') != ''
+        working-directory: ./python
+        run: |
+          if [[ -f "pyproject.toml" ]]; then uv sync --group dev || true; fi
+          uv pip install bandit safety || true
+          uv run bandit -r src -f json -o bandit-report.json || true
+          uv run safety check --json --output safety-report.json || true
+
+      # -------- Terraform security (tfsec) --------
+      - name: Terraform security (tfsec)
         if: hashFiles('**/*.tf') != ''
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           format: sarif
-          output: tfsec.sarif
+          output: ${{ github.workspace }}/tfsec.sarif  # explicit absolute path
 
-      - name: Upload SARIF file
+      - name: Upload tfsec SARIF
+        if: always() && hashFiles(format('{0}/tfsec.sarif', github.workspace)) != ''
         uses: github/codeql-action/upload-sarif@v3
-        if: hashFiles('**/*.tf') != ''
         with:
-          sarif_file: tfsec.sarif
+          sarif_file: ${{ github.workspace }}/tfsec.sarif
           category: "terraform-security"
