@@ -265,8 +265,8 @@ jobs:
             ### 1. **ANALYZE FAILURES**
             - Read ALL Python files in the repository 
             - Check for syntax errors, import errors, and logical issues
-            - Look specifically at `python/broken_python.py` which likely has intentional test errors
-            - Examine any linting/test output
+            - Look specifically at `python/broken_python.py` and `src/` files
+            - Examine any linting/test output for specific error codes
             
             ### 2. **FIX THESE SPECIFIC ISSUES**
             **Python Syntax Errors** (CRITICAL):
@@ -275,17 +275,30 @@ jobs:
             - Import errors for non-existent modules
             - Function call syntax errors
             
+            **Linting and Type Errors** (CRITICAL):
+            - Missing type annotations (ANN001, ANN201, ANN204)
+            - Import issues (F401 unused imports, UP035/UP006 deprecated typing)
+            - Formatting issues (W292 missing newlines, W293 blank line whitespace)
+            - Code style (Q000 quote style, E501 line length, D401 docstring style)
+            - Logic simplification (SIM102, SIM201)
+            
             **Common CI Issues**:
-            - Linting errors (flake8, black, isort)
+            - Linting errors (ruff, flake8, black, isort)
             - Test failures and assertion errors
             - Type checking issues
             - Dependency/import problems
             
             ### 3. **IMPLEMENTATION RULES**
             ✅ **DO**: Fix syntax errors, remove bad imports, correct function definitions
-            ✅ **DO**: Run Python syntax checker: `python -m py_compile filename.py`
+            ✅ **DO**: Add missing type annotations to all functions and parameters  
+            ✅ **DO**: Fix import statements (remove unused, update deprecated typing)
+            ✅ **DO**: Add missing newlines at end of files
+            ✅ **DO**: Remove whitespace from blank lines
+            ✅ **DO**: Use double quotes consistently (Q000)
+            ✅ **DO**: Break long lines under 88 characters (E501)
+            ✅ **DO**: Simplify nested if statements (SIM102, SIM201)
             ✅ **DO**: Make sure ALL Python files compile without errors
-            ✅ **DO**: Fix logical errors in test functions
+            ✅ **DO**: Run linting checks: `ruff check . --fix`
             ❌ **DON'T**: Modify .github/workflows/ files
             ❌ **DON'T**: Change core business logic unnecessarily
             
@@ -293,24 +306,40 @@ jobs:
             After making changes, MUST verify:
             ```bash
             # Check Python syntax
-            python3 -m py_compile python/*.py
+            python3 -m py_compile python/*.py src/*.py
+            
+            # Run linting and auto-fix what you can
+            ruff check . --fix
+            ruff format .
             
             # Run tests if they exist
-            cd python && python -m pytest . || python -m unittest discover
+            cd python && python -m pytest . || python -m unittest discover || true
             
-            # Check for linting issues
-            python3 -m flake8 python/ || true
+            # Final verification that files are clean
+            ruff check . --no-fix
             ```
             
             ## 🚀 START FIXING NOW!
-            Begin by reading all Python files and identifying syntax/logical errors. Make the minimal fixes needed to get CI passing.
             
-            **Expected files to check:**
-            - `python/broken_python.py` (likely has test syntax errors)
-            - Any other `.py` files in the repository
-            - Test files that might be failing
+            **CRITICAL**: The CI is failing with specific linting errors. You must fix ALL of these:
             
-            **Success criteria:** All Python files compile cleanly, tests pass, linting passes.
+            **Files to fix:**
+            - `python/broken_python.py` - Add type annotations, fix formatting
+            - `src/main.py` - Fix imports, type annotations, formatting, logic
+            - `src/__init__.py` - Add missing newline
+            
+            **Specific error codes to address:**
+            - **ANN001/ANN201/ANN204**: Add type annotations to ALL functions and parameters
+            - **F401**: Remove unused imports like `typing.Any`  
+            - **UP035/UP006**: Replace `List` with `list`, remove `typing.List`
+            - **W292/W293**: Add newlines, remove whitespace from blank lines
+            - **Q000**: Use double quotes consistently
+            - **E501**: Break lines over 88 characters
+            - **SIM102/SIM201**: Simplify nested conditions
+            - **D401**: Fix docstring imperative mood
+            - **TRY401**: Remove redundant exception args in logging
+            
+            **Success criteria:** ALL ruff/linting errors resolved, files pass `ruff check .`
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           acknowledge-dangerously-skip-permissions-responsibility: "true"
           claude_args: "--max-turns 15 --model claude-sonnet-4-20250514 --dangerously-skip-permissions"
