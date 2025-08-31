@@ -220,6 +220,27 @@ jobs:
               core.setFailed(`Failed to collect job details: ${error.message}`);
             }
 
+      - name: Pre-Claude analysis
+        run: |
+          echo "::group::Pre-Claude Analysis"
+          echo "Current working directory: $(pwd)"
+          echo "Files in repository:"
+          find . -name "*.py" -type f | head -10
+          
+          echo ""
+          echo "Checking Python file syntax before Claude:"
+          for pyfile in python/*.py; do
+            if [ -f "$pyfile" ]; then
+              echo "Checking $pyfile..."
+              python3 -m py_compile "$pyfile" 2>&1 || echo "❌ Syntax error in $pyfile"
+            fi
+          done
+          
+          echo ""
+          echo "Git status before Claude:"
+          git status --porcelain
+          echo "::endgroup::"
+
       - name: Create backup before Claude changes
         run: |
           echo "::group::Creating backup"
@@ -232,42 +253,70 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           prompt: |
-            ## /fix-ci
+            ## 🚨 CRITICAL CI FAILURE - IMMEDIATE FIXES REQUIRED
+            
             **Repository:** ${{ github.repository }}
-            **Base Branch:** ${{ steps.pick.outputs.base_ref }}
-            **PR Branch:** ${{ steps.pick.outputs.head_ref }}
-            **Failed Jobs:** ${{ steps.details.outputs.failed || 'Manual run - check all potential issues' }}
+            **Branch:** ${{ steps.pick.outputs.head_ref }} → ${{ steps.pick.outputs.base_ref }}
+            **Failed Jobs:** ${{ steps.details.outputs.failed || 'Manual run - analyze all files' }}
             
-            **Context:** This is an automated CI fix request. A workflow run failed and I need to make minimal, targeted changes to resolve the failing checks.
+            ## 🎯 YOUR MISSION: Fix ALL CI failures
             
-            **Your Task:**
-            1. Analyze the failing CI jobs and their error messages by examining logs
-            2. Identify the root cause of the failures
-            3. Make minimal, surgical fixes to resolve the issues
-            4. Ensure changes don't break existing functionality
-            5. Focus on common CI issues like:
-               - Linting/formatting errors (eslint, prettier, etc.)
-               - Test failures due to outdated snapshots
-               - TypeScript/compilation errors
-               - Dependency issues or missing packages
-               - Configuration problems
-               - Build errors
+            A CI workflow has FAILED and needs immediate fixes. You MUST:
             
-            **Constraints:**
-            - Keep changes as small as possible
-            - DO NOT modify files in .github/workflows/ directory
-            - Do not change core business logic
-            - Focus only on fixing CI-related issues (code, tests, config, dependencies)
-            - Prefer configuration/tooling fixes over code changes when possible
-            - Always run tests after making changes to verify fixes
+            ### 1. **ANALYZE FAILURES**
+            - Read ALL Python files in the repository 
+            - Check for syntax errors, import errors, and logical issues
+            - Look specifically at `python/broken_python.py` which likely has intentional test errors
+            - Examine any linting/test output
             
-            **Instructions:**
-            Please analyze the repository and fix the CI failures. Start by examining recent commits, CI logs, and test files. 
-            Make sure to test your changes before finishing.
+            ### 2. **FIX THESE SPECIFIC ISSUES**
+            **Python Syntax Errors** (CRITICAL):
+            - Missing colons in function definitions
+            - Invalid variable assignments 
+            - Import errors for non-existent modules
+            - Function call syntax errors
+            
+            **Common CI Issues**:
+            - Linting errors (flake8, black, isort)
+            - Test failures and assertion errors
+            - Type checking issues
+            - Dependency/import problems
+            
+            ### 3. **IMPLEMENTATION RULES**
+            ✅ **DO**: Fix syntax errors, remove bad imports, correct function definitions
+            ✅ **DO**: Run Python syntax checker: `python -m py_compile filename.py`
+            ✅ **DO**: Make sure ALL Python files compile without errors
+            ✅ **DO**: Fix logical errors in test functions
+            ❌ **DON'T**: Modify .github/workflows/ files
+            ❌ **DON'T**: Change core business logic unnecessarily
+            
+            ### 4. **VERIFICATION STEPS**
+            After making changes, MUST verify:
+            ```bash
+            # Check Python syntax
+            python3 -m py_compile python/*.py
+            
+            # Run tests if they exist
+            cd python && python -m pytest . || python -m unittest discover
+            
+            # Check for linting issues
+            python3 -m flake8 python/ || true
+            ```
+            
+            ## 🚀 START FIXING NOW!
+            Begin by reading all Python files and identifying syntax/logical errors. Make the minimal fixes needed to get CI passing.
+            
+            **Expected files to check:**
+            - `python/broken_python.py` (likely has test syntax errors)
+            - Any other `.py` files in the repository
+            - Test files that might be failing
+            
+            **Success criteria:** All Python files compile cleanly, tests pass, linting passes.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--max-turns 10 --model claude-sonnet-4-20250514"
+          acknowledge-dangerously-skip-permissions-responsibility: "true"
+          claude_args: "--max-turns 15 --model claude-sonnet-4-20250514 --dangerously-skip-permissions"
 
-      - name: Verify Claude changes
+      - name: Verify Claude changes and run tests
         if: steps.claude.outcome == 'success'
         run: |
           echo "::group::Verifying changes made by Claude"
@@ -294,10 +343,71 @@ jobs:
             echo ""
             echo "Detailed diff:"
             git diff HEAD
+            
+            echo ""
+            echo "::group::Testing fixes"
+            
+            # Test Python syntax
+            if ls python/*.py >/dev/null 2>&1; then
+              echo "Testing Python syntax..."
+              for pyfile in python/*.py; do
+                if python3 -m py_compile "$pyfile" 2>&1; then
+                  echo "✅ $pyfile: Syntax OK"
+                else
+                  echo "❌ $pyfile: Syntax Error"
+                fi
+              done
+            fi
+            
+            # Run basic syntax validation
+            echo "Running final syntax check..."
+            for pyfile in python/*.py; do
+              if [ -f "$pyfile" ]; then
+                python3 -c "import ast; ast.parse(open('$pyfile').read())" && echo "✅ $pyfile: Syntax valid" || echo "❌ $pyfile: Syntax error"
+              fi
+            done
+            
+            echo "::endgroup::"
           else
-            echo "No changes detected"
+            echo "No changes detected - Claude may not have found fixable issues"
           fi
           
+          echo "::endgroup::"
+
+      - name: Debug Claude execution
+        if: always()
+        run: |
+          echo "::group::Claude Execution Debug"
+          echo "Claude outcome: ${{ steps.claude.outcome }}"
+          echo "Claude conclusion: ${{ steps.claude.conclusion }}"
+          
+          # Check Claude Code action logs/outputs
+          echo ""
+          echo "Current git status:"
+          git status --porcelain
+          
+          echo ""
+          echo "Any new or modified files?"
+          git diff --name-only HEAD 2>/dev/null || echo "No diff available"
+          
+          echo ""
+          echo "Staged files:"
+          git diff --staged --name-only 2>/dev/null || echo "No staged files"
+          
+          # Check if we have any Python files with remaining issues
+          echo ""
+          echo "Post-Claude Python syntax check:"
+          for pyfile in python/*.py; do
+            if [ -f "$pyfile" ]; then
+              if python3 -m py_compile "$pyfile" 2>&1; then
+                echo "✅ $pyfile: OK"
+              else
+                echo "❌ $pyfile: Still has errors"
+                echo "Content preview:"
+                head -30 "$pyfile" | nl
+              fi
+            fi
+          done
           echo "::endgroup::"
 
       - name: Handle Claude failure
@@ -307,8 +417,14 @@ jobs:
           echo "- Complex issues requiring human intervention"
           echo "- API rate limits or connectivity issues"  
           echo "- Repository structure that Claude couldn't understand"
+          echo "- Permission issues with file modifications"
           echo ""
           echo "Manual investigation may be required."
+          
+          # Show what Claude was supposed to fix
+          echo ""
+          echo "Expected fixes needed:"
+          echo "- python/broken_python.py: Multiple syntax errors"
           
           # Restore backup if it exists
           git stash pop || echo "No backup to restore"
