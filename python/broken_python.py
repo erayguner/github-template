@@ -1,13 +1,12 @@
 # broken_comprehensive_example.py
 
 # --- Syntax Error ---
-def greet(name)  # Fixed colon
-
+def greet(name):  # Fixed colon
     return f"Hello, {name}"
 
 
 # --- Import Error ---
-import non_existent_module  # Commented out non-existent module
+# import non_existent_module  # Commented out non-existent module
 
 
 # --- Runtime Error ---
@@ -26,4 +25,4 @@ def multiply(a, b):
 
 # --- Fake test function ---
 def test_multiply():
-    assert multiply(3, 4) == 12  # Will fail
+    assert multiply(3, 4) == 12  # Should pass
