@@ -1,7 +1,6 @@
-"""
-Tests for the main module.
-"""
+"""Tests for the main module."""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -12,14 +11,14 @@ from src.main import main, parse_arguments
 class TestParseArguments:
     """Test cases for argument parsing."""
 
-    def test_default_arguments(self):
+    def test_default_arguments(self) -> None:
         """Test parsing with no arguments."""
         args = parse_arguments([])
         assert args.verbose is False
         assert args.config is None
         assert args.dry_run is False
 
-    def test_verbose_flag(self):
+    def test_verbose_flag(self) -> None:
         """Test verbose flag parsing."""
         args = parse_arguments(["--verbose"])
         assert args.verbose is True
@@ -27,12 +26,12 @@ class TestParseArguments:
         args = parse_arguments(["-v"])
         assert args.verbose is True
 
-    def test_config_argument(self):
+    def test_config_argument(self) -> None:
         """Test config argument parsing."""
         args = parse_arguments(["--config", "/path/to/config.yml"])
         assert args.config == "/path/to/config.yml"
 
-    def test_dry_run_flag(self):
+    def test_dry_run_flag(self) -> None:
         """Test dry-run flag parsing."""
         args = parse_arguments(["--dry-run"])
         assert args.dry_run is True
@@ -43,7 +42,9 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_success(self, mock_settings, mock_setup_logging):
+    def test_main_success(
+        self, mock_settings: MagicMock, mock_setup_logging: MagicMock
+    ) -> None:
         """Test successful main execution."""
         mock_settings.return_value = MagicMock()
 
@@ -55,7 +56,9 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_with_verbose(self, mock_settings, mock_setup_logging):
+    def test_main_with_verbose(
+        self, mock_settings: MagicMock, mock_setup_logging: MagicMock
+    ) -> None:
         """Test main with verbose flag."""
         mock_settings.return_value = MagicMock()
 
@@ -69,7 +72,7 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_with_config(self, mock_settings, mock_setup_logging):
+    def test_main_with_config(self, mock_settings: MagicMock) -> None:
         """Test main with config file."""
         mock_settings.return_value = MagicMock()
 
@@ -79,7 +82,7 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_with_dry_run(self, mock_settings, mock_setup_logging):
+    def test_main_with_dry_run(self, mock_settings: MagicMock) -> None:
         """Test main with dry-run flag."""
         mock_settings.return_value = MagicMock()
 
@@ -89,7 +92,7 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_keyboard_interrupt(self, mock_settings, mock_setup_logging):
+    def test_main_keyboard_interrupt(self, mock_settings: MagicMock) -> None:
         """Test main handling KeyboardInterrupt."""
         mock_settings.side_effect = KeyboardInterrupt()
 
@@ -99,7 +102,7 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_exception(self, mock_settings, mock_setup_logging):
+    def test_main_exception(self, mock_settings: MagicMock) -> None:
         """Test main handling general exception."""
         mock_settings.side_effect = Exception("Test error")
 
@@ -109,7 +112,7 @@ class TestMain:
 
     @patch("src.main.setup_logging")
     @patch("src.main.Settings")
-    def test_main_exception_verbose(self, mock_settings, mock_setup_logging):
+    def test_main_exception_verbose(self, mock_settings: MagicMock) -> None:
         """Test main handling exception with verbose output."""
         mock_settings.side_effect = Exception("Test error")
 
@@ -122,9 +125,8 @@ class TestIntegration:
     """Integration test cases."""
 
     @pytest.mark.integration
-    def test_full_application_flow(self):
+    def test_full_application_flow(self) -> None:
         """Test the complete application flow."""
-        import os
         # Set DEBUG=True to avoid SECRET_KEY requirement
         old_debug = os.environ.get("DEBUG")
         os.environ["DEBUG"] = "true"

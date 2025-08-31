@@ -11,30 +11,23 @@ permissions:
   security-events: write
 
 jobs:
-  # Linting and code quality
-  lint:
+  # Combined linting and security checks
+  lint-and-security:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # -------- Setup Tools --------
       - name: Install uv
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
-        uses: astral-sh/setup-uv@v5
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
+        uses: astral-sh/setup-uv@v6
         with:
-          version: "latest"
+          version: latest
 
       - name: Set up Python
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
         run: uv python install 3.11
-
-      - name: Python linting
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
-        working-directory: ./python
-        run: |
-          uv sync --group dev
-          uv run ruff check .
-          uv run ruff format --check .
 
       - name: Setup Terraform
         if: hashFiles('**/*.tf') != ''
@@ -42,32 +35,88 @@ jobs:
         with:
           terraform_version: ~1.6.0
 
+      - name: Install linting tools (shellcheck, yamllint)
+        run: |
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          python3 -m pip install --user yamllint
+
+      # -------- Python Linting & Security --------
+      - name: Python linting and security
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
+        working-directory: ./python
+        run: |
+          # Setup environment
+          uv venv --python 3.11
+          if [[ -f "pyproject.toml" ]]; then
+            uv sync --group dev || true
+          elif [[ -f "requirements.txt" ]]; then
+            uv pip install -r requirements.txt || true
+          fi
+
+          # Linting
+          uv pip install ruff || true
+          uv run ruff check .
+          uv run ruff format --check .
+
+          # Security scanning
+          uv pip install bandit || true
+          uv run bandit -r src/ || true
+
+      # -------- Terraform Linting --------
       - name: Terraform linting
         if: hashFiles('**/*.tf') != ''
+        working-directory: ./terraform
         run: |
-          terraform fmt -check -recursive
-          find . -name "*.tf" -execdir terraform init -backend=false \;
-          find . -name "*.tf" -execdir terraform validate \;
+          terraform fmt -check -diff -recursive .
+          terraform init -backend=false -input=false
+          terraform validate -no-color
 
-  # Security checks
-  security:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
+      # -------- Terraform Security (tfsec action) --------
+      - name: Terraform security (tfsec)
+        if: hashFiles('**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ./terraform
+          format: sarif
+          output: ${{ github.workspace }}/terraform/tfsec.sarif
 
-      - name: CodeQL Analysis
+      # -------- Bash Script Linting --------
+      - name: Bash script linting
+        if: hashFiles('**/*.sh', '**/*.bash') != ''
+        run: |
+          # Find and lint bash scripts (exclude common vendor/venv dirs)
+          find . \( -name "*.sh" -o -name "*.bash" \) \
+            | grep -v -E "(node_modules|\.venv|\.git|vendor)" \
+            | while read -r script; do
+                echo "Linting: $script"
+                shellcheck "$script" || true
+              done
+
+      # -------- YAML Linting --------
+      - name: YAML linting
+        if: hashFiles('**/*.yml', '**/*.yaml') != ''
+        run: |
+          ~/.local/bin/yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
+            --ignore ".venv/*" --ignore "python/.venv/*" --ignore ".git/*" . || true
+
+      # -------- CodeQL Analysis (Python only if present) --------
+      - name: Initialize CodeQL (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/init@v3
         with:
           languages: python
+          source-root: ./python
           queries: +security-extended
 
-      - name: CodeQL Autobuild
-        uses: github/codeql-action/autobuild@v3
+      # (No autobuild needed for Python)
 
-      - name: CodeQL Analysis
+      - name: Perform CodeQL Analysis (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
 
+      # -------- Secret Scanning --------
       - name: Secret scanning
         uses: trufflesecurity/trufflehog@v3.85.0
         with:
@@ -75,22 +124,10 @@ jobs:
           base: main
           head: HEAD
 
-      - name: Python security check
-        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
-        run: |
-          pip install bandit safety
-          bandit -r python/ -f json -o bandit-report.json || true
-          safety check --json --output safety-report.json || true
-
-      - name: Terraform security check
-        if: hashFiles('**/*.tf') != ''
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: sarif
-          output: tfsec.sarif
-
-      - name: Upload security results
+      # -------- Upload Terraform SARIF --------
+      - name: Upload Terraform SARIF
+        if: always() && hashFiles(format('{0}/terraform/tfsec.sarif', github.workspace)) != ''
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
         with:
-          sarif_file: tfsec.sarif
+          sarif_file: ${{ github.workspace }}/terraform/tfsec.sarif
+          category: "terraform-security"

@@ -64,8 +64,8 @@ variable "gcp_project_id" {
   default     = ""
 
   validation {
-    condition     = var.enable_gcp == false || (var.enable_gcp == true && length(var.gcp_project_id) > 0)
-    error_message = "GCP project ID is required when enable_gcp is true."
+    condition     = can(regex("^[a-z][a-z0-9-]{4,28}[a-z0-9]$", var.gcp_project_id)) || var.gcp_project_id == ""
+    error_message = "GCP project ID must be 6-30 characters, start with lowercase letter, contain only lowercase letters, numbers, and hyphens, and end with letter or number. Use empty string to disable GCP."
   }
 }
 

@@ -43,10 +43,10 @@ resource "google_compute_firewall" "allow_http" {
     ports    = ["80", "443"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = [var.vpc_cidr] # Only allow from within VPC
   target_tags   = ["web-server"]
 
-  description = "Allow HTTP and HTTPS traffic"
+  description = "Allow HTTP and HTTPS traffic from VPC only"
 }
 
 resource "google_compute_firewall" "allow_ssh" {
@@ -60,10 +60,10 @@ resource "google_compute_firewall" "allow_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["0.0.0.0/0"]
+  source_ranges = [var.vpc_cidr] # Only allow SSH from within VPC
   target_tags   = ["ssh-access"]
 
-  description = "Allow SSH access"
+  description = "Allow SSH access from VPC only"
 }
 
 # GCP Router and NAT (for private instances)
@@ -75,6 +75,24 @@ resource "google_compute_router" "main" {
   network = google_compute_network.main[0].id
 
   description = "Router for ${var.project_name} NAT"
+}
+
+# GCP VPC Flow Logs for security monitoring
+resource "google_compute_subnetwork" "private" {
+  count = var.enable_gcp ? 1 : 0
+
+  name          = "${var.project_name}-private-subnet"
+  ip_cidr_range = cidrsubnet(var.vpc_cidr, 4, 1)
+  region        = var.gcp_region
+  network       = google_compute_network.main[0].id
+
+  description = "Private subnet with flow logs enabled"
+
+  log_config {
+    aggregation_interval = "INTERVAL_10_MIN"
+    flow_sampling        = 0.5
+    metadata             = "INCLUDE_ALL_METADATA"
+  }
 }
 
 resource "google_compute_router_nat" "main" {
