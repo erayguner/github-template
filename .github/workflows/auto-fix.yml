@@ -483,7 +483,7 @@ jobs:
           echo "::endgroup::"
 
       - name: Trigger CI re-run (if PAT available)
-        if: steps.claude.outcome == 'success' && secrets.PAT_TOKEN != ''
+        if: steps.claude.outcome == 'success' && secrets.PAT_TOKEN
         continue-on-error: true
         uses: actions/github-script@v7
         with:
