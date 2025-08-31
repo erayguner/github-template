@@ -24,3 +24,5 @@ def multiply(a, b):
 # --- Fake test function ---
 def test_multiply():   # Missing colon - should trigger auto-fix
     assert multiply(3, 4) == 12  # Will fail
+
+# Test comment to trigger enhanced auto-fix workflow
