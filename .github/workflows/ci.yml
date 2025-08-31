@@ -35,12 +35,10 @@ jobs:
         with:
           terraform_version: ~1.6.0
 
-      - name: Install linting tools
+      - name: Install linting tools (shellcheck, yamllint)
         run: |
-          # Install shellcheck for bash linting
           sudo apt-get update && sudo apt-get install -y shellcheck
-          # Install yamllint for YAML linting
-          pip install yamllint
+          python3 -m pip install --user yamllint
 
       # -------- Python Linting & Security --------
       - name: Python linting and security
@@ -56,6 +54,7 @@ jobs:
           fi
 
           # Linting
+          uv pip install ruff || true
           uv run ruff check .
           uv run ruff format --check .
 
@@ -63,49 +62,59 @@ jobs:
           uv pip install bandit || true
           uv run bandit -r src/ || true
 
-      # -------- Terraform Linting & Security --------
-      - name: Terraform linting and security
+      # -------- Terraform Linting --------
+      - name: Terraform linting
         if: hashFiles('**/*.tf') != ''
         working-directory: ./terraform
         run: |
-          # Linting
-          terraform fmt -check -recursive .
-          terraform init -backend=false
-          terraform validate
+          terraform fmt -check -diff -recursive .
+          terraform init -backend=false -input=false
+          terraform validate -no-color
 
-          # Security scanning
-          tfsec . --format sarif --out tfsec.sarif
+      # -------- Terraform Security (tfsec action) --------
+      - name: Terraform security (tfsec)
+        if: hashFiles('**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ./terraform
+          format: sarif
+          output: ${{ github.workspace }}/terraform/tfsec.sarif
 
       # -------- Bash Script Linting --------
       - name: Bash script linting
         if: hashFiles('**/*.sh', '**/*.bash') != ''
         run: |
-          # Find and lint bash scripts (exclude node_modules, .venv, .git)
-          find . -name "*.sh" -o -name "*.bash" | grep -v -E "(node_modules|\.venv|\.git|vendor)" | while read -r script; do
-            echo "Linting: $script"
-            shellcheck "$script" || true
-          done
+          # Find and lint bash scripts (exclude common vendor/venv dirs)
+          find . \( -name "*.sh" -o -name "*.bash" \) \
+            | grep -v -E "(node_modules|\.venv|\.git|vendor)" \
+            | while read -r script; do
+                echo "Linting: $script"
+                shellcheck "$script" || true
+              done
 
       # -------- YAML Linting --------
       - name: YAML linting
         if: hashFiles('**/*.yml', '**/*.yaml') != ''
         run: |
-          # Lint YAML files with basic config (exclude hidden dirs and venv)
-          yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
+          ~/.local/bin/yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
             --ignore ".venv/*" --ignore "python/.venv/*" --ignore ".git/*" . || true
 
-      # -------- CodeQL Analysis --------
-      - name: Initialize CodeQL
+      # -------- CodeQL Analysis (Python only if present) --------
+      - name: Initialize CodeQL (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/init@v3
         with:
           languages: python
+          source-root: ./python
           queries: +security-extended
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      # (No autobuild needed for Python)
 
-      - name: Perform CodeQL Analysis
+      - name: Perform CodeQL Analysis (Python)
+        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
         uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
 
       # -------- Secret Scanning --------
       - name: Secret scanning
@@ -115,10 +124,10 @@ jobs:
           base: main
           head: HEAD
 
-      # -------- Upload Security Results --------
+      # -------- Upload Terraform SARIF --------
       - name: Upload Terraform SARIF
-        if: hashFiles('**/*.tf') != ''
+        if: always() && hashFiles(format('{0}/terraform/tfsec.sarif', github.workspace)) != ''
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: terraform/tfsec.sarif
+          sarif_file: ${{ github.workspace }}/terraform/tfsec.sarif
           category: "terraform-security"
