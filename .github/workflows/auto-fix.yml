@@ -1,848 +1,562 @@
-name: Auto Fix CI Failures
+name: Claude Auto-Fix
 
 on:
+  # Trigger on push to any branch
   workflow_run:
     workflows: ["Basic CI"]        # TODO: Update this to match your CI workflow name exactly
     types: [completed]
-    
+  # Trigger on pull requests
+  pull_request:
+    branches: [main, master, develop]
+  # Manual trigger
   workflow_dispatch:
     inputs:
-      pr_branch:
-        description: "PR head branch (for manual testing; same-repo only)"
-        required: false
-      base_branch:
-        description: "Base branch (default: main)"
-        required: false
-        default: "main"
       force_run:
-        description: "Force run even if no failures detected"
-        type: boolean
+        description: 'Force run even if no issues detected'
         required: false
         default: false
+        type: boolean
+      target_branch:
+        description: 'Target branch for fixes (defaults to current branch)'
+        required: false
+        type: string
 
+# Required permissions for the workflow
 permissions:
   contents: write
   pull-requests: write
+  issues: read
+  checks: read
   actions: read
-  id-token: write
-
-env:
-  MAX_RETRY_ATTEMPTS: 3
-  CLEANUP_THRESHOLD: 10  # Keep only last 10 fix branches
+  security-events: read
 
 jobs:
-  auto-fix:
-    # Only for failed PR runs OR manual runs (but not if this is a retry from same PR)
-    if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'failure' &&
-       github.event.workflow_run.event == 'pull_request' &&
-       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-') &&
-       !contains(github.event.workflow_run.head_commit.message, 'chore(ci): auto-fix CI failures')) ||
-      (github.event_name == 'workflow_dispatch')
+  detect-issues:
+    name: Detect Issues & Auto-Fix
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-
+    
+    # Skip on auto-fix commits to prevent loops
+    if: "!contains(github.event.head_commit.message, '[auto-fix]')"
+    
     steps:
-      - name: Print triggering context (debug)
-        run: |
-          echo "::group::Trigger Context"
-          echo "event_name=${{ github.event_name }}"
-          echo "repository=${{ github.repository }}"
-          echo "run_id=${{ github.run_id }}"
-          echo "run_number=${{ github.run_number }}"
-          
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            echo "workflow_run.name=${{ github.event.workflow_run.name }}"
-            echo "workflow_run.conclusion=${{ github.event.workflow_run.conclusion }}"
-            echo "workflow_run.event=${{ github.event.workflow_run.event }}"
-            echo "workflow_run.head_branch=${{ github.event.workflow_run.head_branch }}"
-            echo "workflow_run.id=${{ github.event.workflow_run.id }}"
-          else
-            echo "manual pr_branch=${{ inputs.pr_branch }}"
-            echo "manual base_branch=${{ inputs.base_branch }}"
-            echo "manual force_run=${{ inputs.force_run }}"
-          fi
-          echo "::endgroup::"
-
-      - name: Verify Claude API key exists
-        run: |
-          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] && [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
-            echo "::error::Missing required API keys. Please set either ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in repository secrets."
-            echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
-            exit 1
-          fi
-          echo "✅ API key configuration verified"
-
-      - name: Determine PR and branches
-        id: pick
-        uses: actions/github-script@v7
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          script: |
-            try {
-              if (context.eventName === 'workflow_dispatch') {
-                const prBranch = '${{ inputs.pr_branch }}';
-                const baseBranch = '${{ inputs.base_branch }}' || 'main';
-                const forceRun = '${{ inputs.force_run }}' === 'true';
-                
-                if (!prBranch) {
-                  core.setFailed('For manual run, pr_branch input is required.');
-                  return;
-                }
-                
-                core.setOutput('head_ref', prBranch);
-                core.setOutput('base_ref', baseBranch);
-                core.setOutput('number', '');
-                core.setOutput('same_repo', 'true');
-                core.setOutput('pr_url', '');
-                core.setOutput('force', forceRun ? 'true' : 'false');
-                core.info(`Manual run: ${prBranch} -> ${baseBranch} (force: ${forceRun})`);
-                return;
-              }
-
-              // workflow_run path
-              const run = context.payload.workflow_run;
-              const prLite = run.pull_requests && run.pull_requests[0];
-              
-              if (!prLite) {
-                core.setFailed('No PR associated with this workflow run. This might be a push to main branch.');
-                return;
-              }
-
-              // Fetch full PR details
-              const { data: pr } = await github.rest.pulls.get({
-                owner: context.repo.owner, 
-                repo: context.repo.repo, 
-                pull_number: prLite.number
-              });
-              
-              const sameRepo = pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
-              
-              core.setOutput('head_ref', pr.head.ref);
-              core.setOutput('base_ref', pr.base.ref);
-              core.setOutput('number', pr.number.toString());
-              core.setOutput('same_repo', sameRepo ? 'true' : 'false');
-              core.setOutput('pr_url', pr.html_url);
-              core.setOutput('force', 'false');
-              
-              core.info(`PR #${pr.number}: ${pr.head.ref} -> ${pr.base.ref} (same_repo: ${sameRepo})`);
-              
-            } catch (error) {
-              core.setFailed(`Failed to determine PR details: ${error.message}`);
-            }
-
-      - name: Checkout target branch
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ steps.pick.outputs.head_ref }}
           fetch-depth: 0
-          persist-credentials: true
-          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup git identity
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name  "github-actions[bot]"
-          git config --global init.defaultBranch main
-
-      - name: Cleanup old fix branches
-        if: steps.pick.outputs.same_repo == 'false'
-        continue-on-error: true
-        run: |
-          echo "::group::Cleaning up old fix branches"
-          
-          # Get all claude-auto-fix branches, sorted by creation date (oldest first)
-          OLD_BRANCHES=$(git branch -r --sort=creatordate | grep "origin/claude-auto-fix-ci-" | head -n -${{ env.CLEANUP_THRESHOLD }} || true)
-          
-          if [ -n "$OLD_BRANCHES" ]; then
-            echo "Found old branches to cleanup:"
-            echo "$OLD_BRANCHES"
-            
-            echo "$OLD_BRANCHES" | while read -r branch; do
-              # Remove origin/ prefix and delete branch
-              BRANCH_NAME=${branch#origin/}
-              echo "Deleting branch: $BRANCH_NAME"
-              git push origin --delete "$BRANCH_NAME" || echo "Failed to delete $BRANCH_NAME"
-            done
-          else
-            echo "No old branches to cleanup"
-          fi
-          
-          echo "::endgroup::"
-
-      - name: Decide fix branch strategy
-        id: branch
-        run: |
-          if [ "${{ steps.pick.outputs.same_repo }}" = "true" ]; then
-            echo "branch=${{ steps.pick.outputs.head_ref }}" >> $GITHUB_OUTPUT
-            echo "mode=direct" >> $GITHUB_OUTPUT
-            echo "🔧 Will push fixes directly to: ${{ steps.pick.outputs.head_ref }}"
-          else
-            # Create unique branch name with timestamp to avoid collisions
-            TIMESTAMP=$(date +%s)
-            FIX_BRANCH="claude-auto-fix-ci-${{ steps.pick.outputs.head_ref }}-${{ github.run_id }}-${TIMESTAMP}"
-            
-            echo "Creating fix branch: $FIX_BRANCH"
-            git checkout -b "$FIX_BRANCH"
-            
-            echo "branch=$FIX_BRANCH" >> $GITHUB_OUTPUT
-            echo "mode=branch" >> $GITHUB_OUTPUT
-            echo "🔧 Created fix branch: $FIX_BRANCH"
-          fi
-
-      - name: Collect failed job details
-        if: github.event_name == 'workflow_run' || steps.pick.outputs.force == 'true'
-        id: details
-        uses: actions/github-script@v7
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          script: |
-            try {
-              if (context.eventName === 'workflow_dispatch' && '${{ steps.pick.outputs.force }}' === 'true') {
-                core.info('Force run: treating as if all jobs need review');
-                core.setOutput('failed', JSON.stringify(['(manual)']));
-                core.setOutput('failed_details', JSON.stringify([]));
-                return;
-              }
+          node-version: '20'
+          cache: 'npm'
+        if: hashFiles('package.json') != ''
 
-              const run_id = context.payload.workflow_run.id;
-              
-              // Get all jobs for the failed workflow run
-              const { data } = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner, 
-                repo: context.repo.repo, 
-                run_id
-              });
-              
-              const failed = data.jobs.filter(j => j.conclusion === 'failure');
-              const failedNames = failed.map(j => j.name);
-              const failedDetails = failed.map(j => ({
-                name: j.name,
-                steps: j.steps?.filter(s => s.conclusion === 'failure').map(s => ({
-                  name: s.name,
-                  conclusion: s.conclusion
-                })) || []
-              }));
-              
-              core.setOutput('failed', JSON.stringify(failedNames));
-              core.setOutput('failed_details', JSON.stringify(failedDetails));
-              
-              core.info(`Found ${failedNames.length} failed jobs: ${failedNames.join(', ')}`);
-              
-            } catch (error) {
-              core.setFailed(`Failed to collect job details: ${error.message}`);
-            }
-
-      - name: Create backup before Claude changes
-        run: |
-          echo "::group::Creating backup"
-          git stash push -m "backup-before-claude-$(date +%s)" --include-untracked || echo "Nothing to backup"
-          echo "::endgroup::"
-
-      - name: Claude - Attempt targeted CI fixes
-        id: claude
-        continue-on-error: true
-        uses: anthropics/claude-code-action@v1
+      - name: Setup Python
+        uses: actions/setup-python@v4
         with:
-          prompt: |
-            ## /fix-ci
+          python-version: '3.11'
+        if: hashFiles('requirements.txt', 'pyproject.toml', '*.py') != ''
 
-            **Repository:** ${{ github.repository }}
-            **Base Branch:** ${{ steps.pick.outputs.base_ref }}
-            **PR Branch:** ${{ steps.pick.outputs.head_ref }}
-            **Failed Jobs:** ${{ steps.details.outputs.failed || 'Manual run - check all potential issues' }}
-            
-            **Context:** This is an automated CI fix request. A workflow run failed and I need to make minimal, targeted changes to resolve the failing checks.
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'
+        if: hashFiles('go.mod', '*.go') != ''
 
-            **CRITICAL: You MUST fix the actual errors, not just format code. Focus on language-specific issues:**
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+        if: hashFiles('Cargo.toml', '*.rs') != ''
 
-            ## 🐍 **Python Fixes**
-            - **Syntax errors**: Missing colons `:`, parentheses, brackets, indentation
-            - **Import errors**: Missing imports, circular imports, wrong module names
-            - **Linting**: flake8, pylint, black formatting issues
-            - **Tests**: pytest failures, assertion errors, missing test dependencies
-            - **Commands to run**: `python -m py_compile *.py`, `flake8 .`, `pytest`, `black --check .`
+      - name: Install dependencies
+        run: |
+          # Install Node.js dependencies
+          if [ -f "package.json" ]; then
+            npm ci || npm install
+          fi
+          
+          # Install Python dependencies
+          if [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          elif [ -f "pyproject.toml" ]; then
+            pip install -e .
+          fi
+          
+          # Install Go dependencies
+          if [ -f "go.mod" ]; then
+            go mod download
+          fi
+          
+          # Install Rust dependencies
+          if [ -f "Cargo.toml" ]; then
+            cargo fetch
+          fi
 
-            ## 🏗️ **Terraform/HCL Fixes**
-            - **Syntax errors**: Missing braces `{}`, quotes, commas
-            - **Resource errors**: Invalid resource names, missing required arguments
-            - **Variable errors**: Undefined variables, type mismatches
-            - **Provider issues**: Missing provider blocks, version constraints
-            - **Commands to run**: `terraform fmt -check`, `terraform validate`, `terragrunt validate`
-
-            ## 📜 **Bash/Shell Script Fixes**
-            - **Syntax errors**: Missing quotes, unescaped characters, wrong operators
-            - **Variable errors**: Undefined variables, wrong variable expansion
-            - **Permissions**: Executable permissions (`chmod +x`)
-            - **Shellcheck issues**: SC codes, best practices violations
-            - **Commands to run**: `shellcheck *.sh`, `bash -n script.sh`
-
-            ## 🟨 **JavaScript/TypeScript Fixes**
-            - **Syntax errors**: Missing semicolons, brackets, parentheses
-            - **ESLint issues**: Unused variables, formatting, best practices
-            - **TypeScript errors**: Type annotations, interface issues
-            - **Import/Export**: Missing imports, wrong paths, circular dependencies
-            - **Tests**: Jest/Mocha failures, missing mocks
-            - **Commands to run**: `npm run lint`, `npm run type-check`, `npm test`, `npm run build`
-
-            ## 📄 **YAML Fixes**
-            - **Indentation errors**: Wrong spacing, tabs vs spaces
-            - **Syntax errors**: Missing colons, wrong list formatting
-            - **GitHub Actions**: Workflow syntax, invalid action versions
-            - **Docker Compose**: Service definitions, volume syntax
-            - **Commands to run**: `yamllint .`, check specific YAML parsers
-
-            ## 🔧 **General CI/CD Issues**
-            - **Dockerfile**: Invalid instructions, missing dependencies
-            - **Package files**: package.json, requirements.txt, Cargo.toml issues
-            - **Configuration files**: Wrong paths, missing environment variables
-            - **Dependencies**: Version conflicts, missing packages
-
-            **Your Task - Follow This Process:**
-
-            1. **EXAMINE CI LOGS**: Look at the actual error messages and failing commands
-            
-            2. **IDENTIFY FILE TYPES**: Determine which languages/tools are failing:
-               ```bash
-               find . -name "*.py" -o -name "*.tf" -o -name "*.sh" -o -name "*.js" -o -name "*.ts" -o -name "*.yml" -o -name "*.yaml"
-               ```
-            
-            3. **RUN LANGUAGE-SPECIFIC CHECKS**:
-               - Python: `python -m py_compile file.py && flake8 file.py`
-               - Terraform: `terraform fmt -check . && terraform validate`
-               - Shell: `shellcheck script.sh && bash -n script.sh`  
-               - JavaScript: `npm run lint && npm run build`
-               - YAML: `yamllint file.yml`
-            
-            4. **FIX EACH ERROR SYSTEMATICALLY**:
-               - **Syntax first**: Fix all parsing/compilation errors
-               - **Linting second**: Address style and quality issues
-               - **Tests last**: Fix failing test cases
-            
-            5. **VERIFY EACH FIX**: Re-run the specific command to ensure it passes
-            
-            6. **COMMON FIXES BY LANGUAGE**:
-
-            **Python Examples:**
-            ```python
-            # Fix: def greet(name) # Missing colon
-            def greet(name):  # ✅ Added colon
-                return f"Hello, {name}"
-            
-            # Fix: Missing imports
-            import os  # ✅ Add missing imports
-            
-            # Fix: Add newline at end of file ✅
-            ```
-
-            **Terraform Examples:**
-            ```hcl
-            # Fix: Missing quotes
-            resource "aws_instance" "example" {  # ✅ Added quotes
-              ami           = "ami-12345"        # ✅ Added quotes
-              instance_type = "t2.micro"
-            }
-            ```
-
-            **Shell Examples:**
-            ```bash
-            #!/bin/bash
-            # Fix: Unquoted variables
-            echo "Hello, ${name}"  # ✅ Quoted variable
-            
-            # Fix: Add error handling
-            set -euo pipefail  # ✅ Add strict mode
-            ```
-
-            **JavaScript Examples:**
-            ```javascript
-            // Fix: Missing semicolon
-            const name = 'World';  // ✅ Added semicolon
-            
-            // Fix: Unused variables
-            // const unused = 'test';  // ✅ Remove or use variable
-            ```
-
-            **YAML Examples:**
-            ```yaml
-            # Fix: Indentation
-            jobs:
-              test:  # ✅ Proper 2-space indentation
-                runs-on: ubuntu-latest
-            ```
-
-            **Constraints:**
-            - DO NOT modify files in .github/workflows/ directory
-            - Fix ALL syntax errors completely - don't leave broken code
-            - Add missing newlines at end of files if required by linters
-            - Keep changes minimal but ensure they actually work
-            - Test each fix immediately after making it
-
-            **VERIFICATION REQUIREMENTS:**
-            After fixing each file type, you MUST run verification commands:
-            - Python: `find . -name "*.py" -exec python -m py_compile {} \;`
-            - Terraform: `terraform validate` (if .tf files exist)
-            - Shell: `find . -name "*.sh" -exec shellcheck {} \;`
-            - JavaScript/Node: `npm run lint` or `npm run build` (if package.json exists)
-            - YAML: Check syntax with appropriate tools
-
-            **Final Step:** Provide a detailed summary of:
-            - Which files were modified
-            - What specific errors were fixed for each language
-            - Which verification commands passed
-            - Any remaining issues that need manual intervention
-
-            Start by examining the repository structure and CI logs to understand what languages and tools are being used.
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--max-turns 20 --model claude-sonnet-4-20250514"
-
-      - name: Verify fixes actually work
-        id: verify_fixes
-        if: steps.claude.outcome == 'success'
+      - name: Run linters and collect issues
+        id: lint
         continue-on-error: true
         run: |
-          echo "::group::Verifying that fixes actually resolve CI issues"
+          echo "## 🔍 Detecting Issues" >> $GITHUB_STEP_SUMMARY
           
-          # Check if any files were modified
-          CHANGED_FILES=$(git diff --name-only HEAD || true)
-          STAGED_FILES=$(git diff --staged --name-only || true)
-          UNTRACKED_FILES=$(git ls-files --others --exclude-standard || true)
+          ISSUES_FOUND=false
           
-          echo "Modified files:"
-          echo "${CHANGED_FILES:-None}"
-          echo ""
-          echo "Staged files:"
-          echo "${STAGED_FILES:-None}"
-          echo ""
-          echo "Untracked files:"
-          echo "${UNTRACKED_FILES:-None}"
-          
-          # Show a summary of changes
-          if [ -n "$CHANGED_FILES" ] || [ -n "$STAGED_FILES" ] || [ -n "$UNTRACKED_FILES" ]; then
-            echo ""
-            echo "Summary of changes:"
-            git status --porcelain=v1
-            echo ""
-            echo "Detailed diff:"
-            git diff HEAD
+          # JavaScript/TypeScript linting
+          if [ -f "package.json" ]; then
+            echo "### JavaScript/TypeScript Issues" >> $GITHUB_STEP_SUMMARY
             
-            echo ""
-            echo "🧪 Running language-specific verification tests..."
-            
-            # Python verification
-            if find . -name "*.py" -not -path "./.git/*" | head -1 | grep -q "\.py$"; then
-              echo "🐍 Checking Python files..."
-              if command -v python3 &> /dev/null; then
-                echo "  - Syntax check:"
-                find . -name "*.py" -not -path "./.git/*" -exec python3 -m py_compile {} \; && echo "    ✅ Python syntax check passed" || echo "    ❌ Python syntax errors still exist"
-                
-                if command -v flake8 &> /dev/null; then
-                  echo "  - Flake8 linting:"
-                  flake8 . --exclude=.git && echo "    ✅ Flake8 passed" || echo "    ⚠️ Flake8 issues remain"
-                fi
-                
-                if command -v black &> /dev/null; then
-                  echo "  - Black formatting:"
-                  black --check . && echo "    ✅ Black formatting passed" || echo "    ⚠️ Black formatting issues remain"
-                fi
-              fi
-            fi
-            
-            # Terraform verification
-            if find . -name "*.tf" -not -path "./.git/*" | head -1 | grep -q "\.tf$"; then
-              echo "🏗️ Checking Terraform files..."
-              if command -v terraform &> /dev/null; then
-                echo "  - Terraform formatting:"
-                terraform fmt -check=true -recursive && echo "    ✅ Terraform formatting passed" || echo "    ⚠️ Terraform formatting issues remain"
-                
-                echo "  - Terraform validation:"
-                terraform init -backend=false &>/dev/null || true
-                terraform validate && echo "    ✅ Terraform validation passed" || echo "    ⚠️ Terraform validation issues remain"
-              fi
-            fi
-            
-            # Shell script verification
-            if find . -name "*.sh" -not -path "./.git/*" | head -1 | grep -q "\.sh$"; then
-              echo "📜 Checking Shell scripts..."
-              if command -v shellcheck &> /dev/null; then
-                echo "  - Shellcheck:"
-                find . -name "*.sh" -not -path "./.git/*" -exec shellcheck {} \; && echo "    ✅ Shellcheck passed" || echo "    ⚠️ Shellcheck issues remain"
-              fi
-              
-              echo "  - Bash syntax:"
-              find . -name "*.sh" -not -path "./.git/*" -exec bash -n {} \; && echo "    ✅ Bash syntax check passed" || echo "    ❌ Bash syntax errors still exist"
-            fi
-            
-            # JavaScript/TypeScript verification
-            if [ -f "package.json" ]; then
-              echo "🟨 Checking JavaScript/TypeScript project..."
-              if command -v npm &> /dev/null; then
-                echo "  - Dependencies:"
-                npm ci --silent &>/dev/null || npm install --silent &>/dev/null && echo "    ✅ Dependencies installed" || echo "    ⚠️ Dependency issues"
-                
-                if npm run --silent lint 2>/dev/null; then
-                  echo "    ✅ npm lint passed"
+            # ESLint
+            if npm list eslint &>/dev/null; then
+              echo "Running ESLint..." >> $GITHUB_STEP_SUMMARY
+              if npx eslint . --format json --output-file eslint-report.json 2>/dev/null || true; then
+                if [ -f "eslint-report.json" ] && [ "$(cat eslint-report.json)" != "[]" ]; then
+                  ISSUES_FOUND=true
+                  echo "- ❌ ESLint issues detected" >> $GITHUB_STEP_SUMMARY
                 else
-                  echo "    ⚠️ npm lint issues may remain or script not available"
-                fi
-                
-                if npm run --silent type-check 2>/dev/null; then
-                  echo "    ✅ TypeScript type checking passed"
-                elif npm run --silent build 2>/dev/null; then
-                  echo "    ✅ Build passed"
-                else
-                  echo "    ⚠️ Build/type-check issues may remain"
+                  echo "- ✅ No ESLint issues" >> $GITHUB_STEP_SUMMARY
                 fi
               fi
             fi
             
-            # YAML verification
-            if find . -name "*.yml" -o -name "*.yaml" | grep -v ".git" | head -1 | grep -q "\.ya\?ml$"; then
-              echo "📄 Checking YAML files..."
-              if command -v yamllint &> /dev/null; then
-                echo "  - YAML linting:"
-                yamllint . && echo "    ✅ YAML linting passed" || echo "    ⚠️ YAML linting issues remain"
-              fi
-              
-              # Basic YAML syntax check with Python
-              if command -v python3 &> /dev/null; then
-                echo "  - YAML syntax:"
-                python3 -c "
-import yaml
-import glob
-import sys
-errors = 0
-for file in glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True):
-    if '.git' in file: continue
-    try:
-        with open(file) as f:
-            yaml.safe_load(f)
-    except Exception as e:
-        print(f'    ❌ {file}: {e}')
-        errors += 1
-if errors == 0:
-    print('    ✅ YAML syntax check passed')
-sys.exit(errors > 0)
-" || echo "    ⚠️ YAML syntax issues remain"
-              fi
-            fi
-            
-            echo "verification_status=success" >> $GITHUB_OUTPUT
-          else
-            echo "No changes detected"
-            echo "verification_status=no_changes" >> $GITHUB_OUTPUT
-          fi
-          
-          echo "::endgroup::"
-
-      - name: Handle Claude failure
-        if: steps.claude.outcome == 'failure'
-        run: |
-          echo "::warning::Claude failed to make fixes. This could be due to:"
-          echo "- Complex issues requiring human intervention"
-          echo "- API rate limits or connectivity issues"  
-          echo "- Repository structure that Claude couldn't understand"
-          echo ""
-          echo "Manual investigation may be required."
-          
-          # Restore backup if it exists
-          git stash pop || echo "No backup to restore"
-
-      - name: Commit and push changes
-        if: steps.claude.outcome == 'success'
-        run: |
-          echo "::group::Committing changes"
-          
-          # Stage all changes
-          git add -A
-          
-          # Check if there are changes to commit
-          if git diff --staged --quiet; then
-            echo "::notice::No changes to commit - Claude may have determined no fixes were needed"
-            exit 0
-          fi
-          
-          # Create detailed commit message
-          COMMIT_MSG="chore(ci): auto-fix CI failures
-
-          Auto-generated fixes for failing CI jobs:
-          ${{ steps.details.outputs.failed || 'Manual run' }}
-          
-          Generated by: ${{ github.workflow }} #${{ github.run_number }}
-          Triggered by: ${{ github.event_name }}
-          Repository: ${{ github.repository }}"
-          
-          git commit -m "$COMMIT_MSG"
-          
-          # Push with retry logic
-          for i in $(seq 1 ${{ env.MAX_RETRY_ATTEMPTS }}); do
-            if git push -u origin "${{ steps.branch.outputs.branch }}"; then
-              echo "✅ Successfully pushed changes (attempt $i)"
-              break
-            else
-              echo "⚠️  Push failed (attempt $i/${{ env.MAX_RETRY_ATTEMPTS }})"
-              if [ $i -lt ${{ env.MAX_RETRY_ATTEMPTS }} ]; then
-                echo "Retrying in 5 seconds..."
-                sleep 5
-                git pull --rebase origin "${{ steps.branch.outputs.branch }}" || true
+            # TypeScript compiler
+            if npm list typescript &>/dev/null; then
+              echo "Running TypeScript check..." >> $GITHUB_STEP_SUMMARY
+              if ! npx tsc --noEmit 2>tsc-errors.txt; then
+                ISSUES_FOUND=true
+                echo "- ❌ TypeScript compilation errors detected" >> $GITHUB_STEP_SUMMARY
               else
-                echo "::error::Failed to push after ${{ env.MAX_RETRY_ATTEMPTS }} attempts"
-                exit 1
+                echo "- ✅ No TypeScript errors" >> $GITHUB_STEP_SUMMARY
               fi
             fi
-          done
+            
+            # Prettier
+            if npm list prettier &>/dev/null; then
+              echo "Checking Prettier formatting..." >> $GITHUB_STEP_SUMMARY
+              if ! npx prettier --check . 2>/dev/null; then
+                ISSUES_FOUND=true
+                echo "- ❌ Code formatting issues detected" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ✅ Code is properly formatted" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          fi
           
-          echo "::endgroup::"
+          # Python linting
+          if compgen -G "*.py" > /dev/null; then
+            echo "### Python Issues" >> $GITHUB_STEP_SUMMARY
+            
+            # Install Python linting tools
+            pip install -q flake8 black isort mypy pylint bandit safety || true
+            
+            # Flake8
+            if command -v flake8 &>/dev/null; then
+              echo "Running Flake8..." >> $GITHUB_STEP_SUMMARY
+              if ! flake8 . --output-file=flake8-report.txt 2>/dev/null; then
+                ISSUES_FOUND=true
+                echo "- ❌ Flake8 issues detected" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ✅ No Flake8 issues" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+            
+            # Black formatting
+            if command -v black &>/dev/null; then
+              echo "Checking Black formatting..." >> $GITHUB_STEP_SUMMARY
+              if ! black --check . 2>/dev/null; then
+                ISSUES_FOUND=true
+                echo "- ❌ Black formatting issues detected" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ✅ Code is properly formatted (Black)" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+            
+            # Security check with Bandit
+            if command -v bandit &>/dev/null; then
+              echo "Running Bandit security check..." >> $GITHUB_STEP_SUMMARY
+              if ! bandit -r . -f json -o bandit-report.json 2>/dev/null; then
+                ISSUES_FOUND=true
+                echo "- ❌ Security issues detected" >> $GITHUB_STEP_SUMMARY
+              else
+                echo "- ✅ No security issues found" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          fi
+          
+          # Go linting
+          if [ -f "go.mod" ]; then
+            echo "### Go Issues" >> $GITHUB_STEP_SUMMARY
+            
+            # Go fmt
+            if [ -n "$(gofmt -l .)" ]; then
+              ISSUES_FOUND=true
+              echo "- ❌ Go formatting issues detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ Go code is properly formatted" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Go vet
+            if ! go vet ./... 2>go-vet-errors.txt; then
+              ISSUES_FOUND=true
+              echo "- ❌ Go vet issues detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ No Go vet issues" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Staticcheck
+            go install honnef.co/go/tools/cmd/staticcheck@latest
+            if ! staticcheck ./... 2>staticcheck-errors.txt; then
+              ISSUES_FOUND=true
+              echo "- ❌ Staticcheck issues detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ No staticcheck issues" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Rust linting
+          if [ -f "Cargo.toml" ]; then
+            echo "### Rust Issues" >> $GITHUB_STEP_SUMMARY
+            
+            # Cargo fmt
+            if ! cargo fmt -- --check 2>/dev/null; then
+              ISSUES_FOUND=true
+              echo "- ❌ Rust formatting issues detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ Rust code is properly formatted" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            # Cargo clippy
+            if ! cargo clippy -- -D warnings 2>clippy-errors.txt; then
+              ISSUES_FOUND=true
+              echo "- ❌ Clippy issues detected" >> $GITHUB_STEP_SUMMARY
+            else
+              echo "- ✅ No Clippy issues" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "issues_found=$ISSUES_FOUND" >> $GITHUB_OUTPUT
 
-      - name: Comment on original PR (direct push)
-        if: |
-          github.event_name == 'workflow_run' && 
-          steps.branch.outputs.mode == 'direct' && 
-          steps.pick.outputs.number != '' &&
-          steps.claude.outcome == 'success'
-        uses: actions/github-script@v7
+      - name: Run tests
+        id: tests
+        continue-on-error: true
+        run: |
+          echo "## 🧪 Running Tests" >> $GITHUB_STEP_SUMMARY
+          
+          TEST_FAILURES=false
+          
+          # Node.js tests
+          if [ -f "package.json" ]; then
+            if npm run test --if-present 2>test-errors.txt; then
+              echo "- ✅ Node.js tests passed" >> $GITHUB_STEP_SUMMARY
+            else
+              TEST_FAILURES=true
+              echo "- ❌ Node.js tests failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Python tests
+          if compgen -G "test_*.py" > /dev/null || compgen -G "*_test.py" > /dev/null; then
+            pip install -q pytest || true
+            if command -v pytest &>/dev/null; then
+              if pytest 2>pytest-errors.txt; then
+                echo "- ✅ Python tests passed" >> $GITHUB_STEP_SUMMARY
+              else
+                TEST_FAILURES=true
+                echo "- ❌ Python tests failed" >> $GITHUB_STEP_SUMMARY
+              fi
+            fi
+          fi
+          
+          # Go tests
+          if [ -f "go.mod" ]; then
+            if go test ./... 2>go-test-errors.txt; then
+              echo "- ✅ Go tests passed" >> $GITHUB_STEP_SUMMARY
+            else
+              TEST_FAILURES=true
+              echo "- ❌ Go tests failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Rust tests
+          if [ -f "Cargo.toml" ]; then
+            if cargo test 2>rust-test-errors.txt; then
+              echo "- ✅ Rust tests passed" >> $GITHUB_STEP_SUMMARY
+            else
+              TEST_FAILURES=true
+              echo "- ❌ Rust tests failed" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          echo "test_failures=$TEST_FAILURES" >> $GITHUB_OUTPUT
+
+      - name: Create issue reports
+        if: steps.lint.outputs.issues_found == 'true' || steps.tests.outputs.test_failures == 'true'
+        run: |
+          mkdir -p .claude/reports
+          
+          # Collect all issues into a comprehensive report
+          cat > .claude/reports/issues.md << 'EOF'
+          # 🚨 Auto-Detected Issues Report
+          
+          Generated on: $(date)
+          Branch: ${{ github.ref_name }}
+          Commit: ${{ github.sha }}
+          
+          ## Summary
+          - Issues Found: ${{ steps.lint.outputs.issues_found }}
+          - Test Failures: ${{ steps.tests.outputs.test_failures }}
+          
+          ## Detailed Issues
+          EOF
+          
+          # Add linting issues
+          if [ -f "eslint-report.json" ]; then
+            echo -e "\n### ESLint Issues\n\`\`\`json" >> .claude/reports/issues.md
+            cat eslint-report.json >> .claude/reports/issues.md
+            echo -e "\`\`\`" >> .claude/reports/issues.md
+          fi
+          
+          if [ -f "flake8-report.txt" ]; then
+            echo -e "\n### Flake8 Issues\n\`\`\`" >> .claude/reports/issues.md
+            cat flake8-report.txt >> .claude/reports/issues.md
+            echo -e "\`\`\`" >> .claude/reports/issues.md
+          fi
+          
+          # Add test failures
+          if [ -f "test-errors.txt" ]; then
+            echo -e "\n### Test Failures\n\`\`\`" >> .claude/reports/issues.md
+            cat test-errors.txt >> .claude/reports/issues.md
+            echo -e "\`\`\`" >> .claude/reports/issues.md
+          fi
+
+      - name: Auto-fix with Claude
+        if: (steps.lint.outputs.issues_found == 'true' || steps.tests.outputs.test_failures == 'true' || github.event.inputs.force_run == 'true') && secrets.ANTHROPIC_API_KEY != ''
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "## 🤖 Auto-Fixing with Claude" >> $GITHUB_STEP_SUMMARY
+          
+          # Use Python with Anthropic SDK for more reliable Claude integration
+          cat > claude_fixer.py << 'EOF'
+          import os
+          import sys
+          import subprocess
+          import json
+          from anthropic import Anthropic
+
+          def main():
+              api_key = os.environ.get('ANTHROPIC_API_KEY')
+              if not api_key:
+                  print("❌ ANTHROPIC_API_KEY not found")
+                  return False
+
+              try:
+                  client = Anthropic(api_key=api_key)
+                  
+                  # Collect repository information
+                  repo_files = []
+                  for ext in ['*.py', '*.js', '*.ts', '*.go', '*.rs']:
+                      result = subprocess.run(['find', '.', '-name', ext], capture_output=True, text=True)
+                      repo_files.extend(result.stdout.strip().split('\n') if result.stdout.strip() else [])
+                  
+                  # Read issue reports
+                  issues_content = ""
+                  if os.path.exists('.claude/reports/issues.md'):
+                      with open('.claude/reports/issues.md', 'r') as f:
+                          issues_content = f.read()
+                  
+                  # Create comprehensive fix prompt
+                  prompt = f"""You are an expert code reviewer and auto-fixer. Please analyze this repository and fix all detected issues:
+
+          ## Task
+          Fix all issues in this repository while maintaining functionality:
+          1. **Linting Issues**: Resolve all linter warnings/errors
+          2. **Formatting**: Apply consistent code formatting
+          3. **Test Failures**: Fix failing tests
+          4. **Security**: Address vulnerabilities
+          5. **Type Errors**: Resolve compilation issues
+
+          ## Repository Files ({len([f for f in repo_files if f])})
+          {chr(10).join(f for f in repo_files[:20] if f)}
+
+          ## Detected Issues
+          {issues_content or 'See CI output for specific issues detected by linters and tests.'}
+
+          ## Instructions
+          - Make targeted fixes that resolve specific issues
+          - Maintain original functionality
+          - Follow existing code style and patterns
+          - Ensure all tests pass after fixes
+          - Output a summary of changes made
+
+          Please provide specific fixes for each detected issue."""
+
+                  # Request fixes from Claude
+                  response = client.messages.create(
+                      model="claude-3-5-sonnet-20241022",
+                      max_tokens=4000,
+                      messages=[{"role": "user", "content": prompt}]
+                  )
+                  
+                  with open('claude-fixes.txt', 'w') as f:
+                      f.write(response.content[0].text)
+                  
+                  print("✅ Claude analysis completed")
+                  print("Fixes saved to: claude-fixes.txt")
+                  return True
+                  
+              except Exception as e:
+                  print(f"❌ Claude integration error: {e}")
+                  return False
+
+          if __name__ == "__main__":
+              success = main()
+              sys.exit(0 if success else 1)
+          EOF
+          
+          # Install anthropic SDK and run Claude fixer
+          pip install anthropic
+          echo "Invoking Claude for intelligent auto-fixes..." >> $GITHUB_STEP_SUMMARY
+          if python claude_fixer.py; then
+            echo "- ✅ Claude analysis completed" >> $GITHUB_STEP_SUMMARY
+            if [ -f "claude-fixes.txt" ]; then
+              echo "- 📋 Fix recommendations generated" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "- ❌ Claude integration failed" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Apply formatting fixes
+        if: steps.lint.outputs.issues_found == 'true'
+        run: |
+          echo "## 🎨 Applying Formatting Fixes" >> $GITHUB_STEP_SUMMARY
+          
+          # JavaScript/TypeScript formatting
+          if [ -f "package.json" ] && npm list prettier &>/dev/null; then
+            npx prettier --write . || true
+            echo "- ✅ Applied Prettier formatting" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Python formatting
+          if compgen -G "*.py" > /dev/null; then
+            if command -v black &>/dev/null; then
+              black . || true
+              echo "- ✅ Applied Black formatting" >> $GITHUB_STEP_SUMMARY
+            fi
+            
+            if command -v isort &>/dev/null; then
+              isort . || true
+              echo "- ✅ Applied import sorting" >> $GITHUB_STEP_SUMMARY
+            fi
+          fi
+          
+          # Go formatting
+          if [ -f "go.mod" ]; then
+            gofmt -w . || true
+            echo "- ✅ Applied Go formatting" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          # Rust formatting
+          if [ -f "Cargo.toml" ]; then
+            cargo fmt || true
+            echo "- ✅ Applied Rust formatting" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Commit and push fixes
+        if: steps.lint.outputs.issues_found == 'true' || steps.tests.outputs.test_failures == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "Claude Auto-Fix Bot"
+          
+          # Check for changes
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "## 💾 Committing Fixes" >> $GITHUB_STEP_SUMMARY
+            
+            # Add changed files
+            git add -A
+            
+            # Create detailed commit message
+            COMMIT_MSG="[auto-fix] Resolve issues detected by CI
+
+            🤖 Generated with Claude Code
+            
+            Fixes applied:
+            - Linting issues resolved
+            - Code formatting applied
+            - Test failures addressed
+            
+            Branch: ${{ github.ref_name }}
+            Workflow: ${{ github.workflow }}
+            Run: ${{ github.run_number }}"
+            
+            git commit -m "$COMMIT_MSG" || exit 0
+            
+            # Push changes
+            TARGET_BRANCH="${{ github.event.inputs.target_branch || github.ref_name }}"
+            git push origin HEAD:$TARGET_BRANCH
+            
+            echo "- ✅ Changes committed and pushed to $TARGET_BRANCH" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- ℹ️ No changes to commit" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Create Pull Request (for main/master branches)
+        if: (github.ref_name == 'main' || github.ref_name == 'master') && steps.lint.outputs.issues_found == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a fix branch
+          FIX_BRANCH="auto-fix/$(date +%Y%m%d-%H%M%S)"
+          git checkout -b $FIX_BRANCH
+          
+          # Push fix branch
+          git push origin $FIX_BRANCH
+          
+          # Create PR using GitHub CLI
+          gh pr create \
+            --title "🤖 [Auto-Fix] Resolve detected issues" \
+            --body "This PR contains automated fixes generated by Claude Code.
+            
+            ## Changes
+            - Resolved linting issues
+            - Applied code formatting
+            - Fixed test failures
+            
+            ## Review Notes
+            These changes were automatically generated. Please review before merging.
+            
+            Generated by: ${{ github.workflow }} #${{ github.run_number }}" \
+            --head $FIX_BRANCH \
+            --base ${{ github.ref_name }}
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          script: |
-            let commentBody = `🤖 **Auto-fixes applied**
-
-            I've automatically pushed fixes for the failing CI jobs directly to \`${{ steps.pick.outputs.head_ref }}\`.
-
-            **Failed jobs:** ${{ steps.details.outputs.failed }}
-
-            ## 🔧 Fixes Applied
-
-            `;
-
-            // Get the changes and create a detailed comment
-            const { execSync } = require('child_process');
-            
-            try {
-              // Get changed files
-              const changedFiles = execSync('git diff --name-only HEAD~1 HEAD', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
-              
-              if (changedFiles.length > 0) {
-                commentBody += `**Modified files:**\n`;
-                changedFiles.forEach(file => {
-                  const ext = file.split('.').pop().toLowerCase();
-                  const emoji = {
-                    'py': '🐍',
-                    'tf': '🏗️',
-                    'hcl': '🏗️',
-                    'sh': '📜',
-                    'bash': '📜',
-                    'js': '🟨',
-                    'ts': '🔷',
-                    'yml': '📄',
-                    'yaml': '📄',
-                    'json': '📦',
-                    'md': '📝'
-                  };
-                  commentBody += `- ${emoji[ext] || '📄'} \`${file}\`\n`;
-                });
-                commentBody += '\n';
-
-                // Analyze the diff for language-specific fixes
-                const diff = execSync('git diff HEAD~1 HEAD', { encoding: 'utf8' });
-                const fixes = [];
-                
-                // Python fixes
-                if (diff.includes('.py') || diff.match(/def.*:\s*\n/)) {
-                  if (diff.includes('def ') && diff.includes('):')) {
-                    fixes.push('🐍 **Python**: Fixed missing colons in function definitions');
-                  }
-                  if (diff.match(/\+.*import\s+/)) {
-                    fixes.push('🐍 **Python**: Fixed missing imports');
-                  }
-                  if (diff.includes('assert') && diff.includes('==')) {
-                    fixes.push('🐍 **Python**: Fixed test assertions');
-                  }
-                  if (diff.match(/\+.*\n$/m)) {
-                    fixes.push('🐍 **Python**: Added missing newlines for PEP8 compliance');
-                  }
-                }
-                
-                // Terraform/HCL fixes
-                if (diff.includes('.tf') || diff.includes('.hcl')) {
-                  if (diff.includes('resource ') && diff.includes('{')) {
-                    fixes.push('🏗️ **Terraform**: Fixed resource block syntax');
-                  }
-                  if (diff.match(/\+.*=.*"/)) {
-                    fixes.push('🏗️ **Terraform**: Fixed variable assignments and quotes');
-                  }
-                }
-                
-                // Shell script fixes
-                if (diff.includes('.sh') || diff.includes('#!/bin/bash')) {
-                  if (diff.includes('${') && diff.includes('}')) {
-                    fixes.push('📜 **Shell**: Fixed variable expansions and quoting');
-                  }
-                  if (diff.includes('set -') || diff.includes('pipefail')) {
-                    fixes.push('📜 **Shell**: Added error handling and strict mode');
-                  }
-                }
-                
-                // JavaScript/TypeScript fixes
-                if (diff.includes('.js') || diff.includes('.ts')) {
-                  if (diff.includes(';')) {
-                    fixes.push('🟨 **JavaScript**: Fixed missing semicolons');
-                  }
-                  if (diff.match(/^-.*\/\/.*unused/m)) {
-                    fixes.push('🟨 **JavaScript**: Removed unused variables and imports');
-                  }
-                  if (diff.includes('export ') || diff.includes('import ')) {
-                    fixes.push('🟨 **JavaScript**: Fixed import/export statements');
-                  }
-                }
-                
-                // YAML fixes  
-                if (diff.includes('.yml') || diff.includes('.yaml')) {
-                  if (diff.match(/^\+\s{2,}/m)) {
-                    fixes.push('📄 **YAML**: Fixed indentation and formatting');
-                  }
-                  if (diff.includes('runs-on:') || diff.includes('uses:')) {
-                    fixes.push('📄 **YAML**: Fixed GitHub Actions workflow syntax');
-                  }
-                }
-                
-                // General fixes
-                if (diff.match(/^-.*#.*\n\+.*$/m)) {
-                  fixes.push('🔧 **General**: Fixed linting and formatting issues');
-                }
-                
-                if (diff.includes('package.json') || diff.includes('requirements.txt')) {
-                  fixes.push('📦 **Dependencies**: Fixed package configuration');
-                }
-                
-                if (fixes.length > 0) {
-                  commentBody += '**Language-specific fixes applied:**\n';
-                  fixes.forEach(fix => {
-                    commentBody += `${fix}\n`;
-                  });
-                } else {
-                  commentBody += '✅ Applied various code quality and syntax improvements\n';
-                }
-                
-                commentBody += '\n';
-                
-                // Show diff stats
-                const diffStat = execSync('git diff --stat HEAD~1 HEAD', { encoding: 'utf8' });
-                if (diffStat) {
-                  commentBody += `**Changes summary:**\n\`\`\`\n${diffStat}\n\`\`\`\n\n`;
-                }
-                
-              } else {
-                commentBody += '⚠️ No changes were made - Claude may have determined the issues require manual intervention.\n\n';
-              }
-            } catch (error) {
-              commentBody += '⚠️ Unable to analyze changes in detail, but fixes were attempted.\n\n';
-              console.error('Error analyzing diff:', error);
-            }
-
-            commentBody += `## 🔄 Next Steps
-
-            The CI will re-run automatically to verify these fixes. If issues persist:
-            - The fixes may be incomplete and require manual intervention
-            - There might be additional errors not covered by the automated fixes
-            - Consider reviewing the failing tests and error messages manually
-
-            <details>
-            <summary>Workflow Details</summary>
-            
-            - **Workflow:** ${{ github.workflow }}
-            - **Run:** #${{ github.run_number }}
-            - **Commit:** \`${context.sha.substring(0, 7)}\`
-            - **Trigger:** Auto-fix for failed CI jobs
-            </details>`;
-
-            await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: Number('${{ steps.pick.outputs.number }}'),
-              body: commentBody
-            });
-
-      - name: Create PR for fixes (fork case)
-        if: steps.branch.outputs.mode == 'branch' && steps.claude.outcome == 'success'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const head = "${{ steps.branch.outputs.branch }}";
-            const base = "${{ steps.pick.outputs.base_ref }}";
-            
-            // Check if PR already exists
-            const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner, 
-              repo: context.repo.repo, 
-              state: 'open',
-              head: `${context.repo.owner}:${head}`
-            });
-            
-            if (prs.length > 0) {
-              core.info(`PR already exists: ${prs[0].html_url}`);
-              return;
-            }
-            
-            // Create new PR
-            const prBody = `🤖 **Automated CI Fixes**
-
-            This PR contains automated fixes for failing CI jobs in the original PR.
-
-            **Target PR:** ${{ steps.pick.outputs.pr_url }}
-            **Failed Jobs:** ${{ steps.details.outputs.failed }}
-
-            ## What was fixed
-            Claude analyzed the failing CI jobs and applied targeted fixes to resolve the issues.
-
-            ## Next Steps
-            1. Review the changes in this PR
-            2. If approved, merge this PR
-            3. The fixes will be available for the original PR
-
-            ---
-            *Generated by ${{ github.workflow }} #${{ github.run_number }}*`;
-            
-            try {
-              const { data: pr } = await github.rest.pulls.create({
-                owner: context.repo.owner, 
-                repo: context.repo.repo,
-                title: `chore(ci): auto-fix CI failures for ${{ steps.pick.outputs.head_ref }}`,
-                head: head,
-                base: base,
-                body: prBody
-              });
-              
-              core.info(`✅ Created fix PR: ${pr.html_url}`);
-              
-              // Add labels if they exist
-              try {
-                await github.rest.issues.addLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr.number,
-                  labels: ['automated', 'ci-fix', 'claude-generated']
-                });
-              } catch (labelError) {
-                core.info('Could not add labels (labels may not exist)');
-              }
-              
-            } catch (error) {
-              core.setFailed(`Failed to create PR: ${error.message}`);
-            }
+          name: auto-fix-reports
+          path: |
+            .claude/reports/
+            *-report.*
+            *-errors.txt
+          retention-days: 7
 
       - name: Summary
         if: always()
         run: |
-          echo "::group::Workflow Summary"
-          echo "Event: ${{ github.event_name }}"
-          echo "Branch Strategy: ${{ steps.branch.outputs.mode }}"
-          echo "Target Branch: ${{ steps.branch.outputs.branch }}"
-          echo "Claude Status: ${{ steps.claude.outcome }}"
-          echo "PR Number: ${{ steps.pick.outputs.number }}"
-          echo "::endgroup::"
+          echo "## 📊 Auto-Fix Summary" >> $GITHUB_STEP_SUMMARY
+          echo "- **Workflow**: ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Issues Found**: ${{ steps.lint.outputs.issues_found || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Failures**: ${{ steps.tests.outputs.test_failures || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
           
-          if [ "${{ steps.claude.outcome }}" = "success" ]; then
-            echo "✅ Workflow completed successfully"
-          elif [ "${{ steps.claude.outcome }}" = "failure" ]; then
-            echo "⚠️  Claude fixes failed - manual intervention may be required"
+          if [ "${{ secrets.ANTHROPIC_API_KEY }}" != "" ]; then
+            echo "- **Claude Integration**: ✅ Enabled" >> $GITHUB_STEP_SUMMARY
           else
-            echo "ℹ️  Workflow completed with mixed results"
+            echo "- **Claude Integration**: ❌ Missing ANTHROPIC_API_KEY" >> $GITHUB_STEP_SUMMARY
           fi
+          
+          echo "- **Runtime**: $(date)" >> $GITHUB_STEP_SUMMARY
