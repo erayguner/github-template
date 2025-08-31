@@ -14,7 +14,7 @@ import non_existent_module
 def divide(a, b):
     return a / b
 
-result = divide(10, 0)  # Division by zero
+result divide(10, 0)  # Division by zero
 
 
 # --- Logic Error (test will fail) ---
@@ -23,5 +23,5 @@ def multiply(a, b):
 
 
 # --- Fake test function ---
-def test_multiply():
+def test_multiply()
     assert multiply(3, 4) == 12  # Will fail
