@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["Basic CI"]        # TODO: Update this to match your CI workflow name exactly
     types: [completed]
+    
   workflow_dispatch:
     inputs:
       pr_branch:
