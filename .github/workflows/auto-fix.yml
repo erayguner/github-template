@@ -483,12 +483,20 @@ jobs:
           echo "::endgroup::"
 
       - name: Trigger CI re-run (if PAT available)
-        if: steps.claude.outcome == 'success' && secrets.PAT_TOKEN
+        if: steps.claude.outcome == 'success'
         continue-on-error: true
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.PAT_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
+            const hasPAT = '${{ secrets.PAT_TOKEN }}' !== '';
+            
+            if (!hasPAT) {
+              console.log('⚠️ PAT_TOKEN not configured - using GITHUB_TOKEN');
+              console.log('New workflows may not trigger automatically due to GitHub security restrictions');
+              return;
+            }
+            
             // Try to re-run the original failed workflow
             const workflowId = "${{ github.event.workflow_run.workflow_id || 'ci.yml' }}";
             const ref = "${{ steps.pick.outputs.head_ref }}";
