@@ -82,6 +82,7 @@ jobs:
               if (context.eventName === 'workflow_dispatch') {
                 const prBranch = '${{ inputs.pr_branch }}';
                 const baseBranch = '${{ inputs.base_branch }}' || 'main';
+                const forceRun = '${{ inputs.force_run }}' === 'true';
                 
                 if (!prBranch) {
                   core.setFailed('For manual run, pr_branch input is required.');
@@ -93,7 +94,8 @@ jobs:
                 core.setOutput('number', '');
                 core.setOutput('same_repo', 'true');
                 core.setOutput('pr_url', '');
-                core.info(`Manual run: ${prBranch} -> ${baseBranch}`);
+                core.setOutput('force', forceRun ? 'true' : 'false');
+                core.info(`Manual run: ${prBranch} -> ${baseBranch} (force: ${forceRun})`);
                 return;
               }
 
@@ -120,6 +122,7 @@ jobs:
               core.setOutput('number', pr.number.toString());
               core.setOutput('same_repo', sameRepo ? 'true' : 'false');
               core.setOutput('pr_url', pr.html_url);
+              core.setOutput('force', 'false');
               
               core.info(`PR #${pr.number}: ${pr.head.ref} -> ${pr.base.ref} (same_repo: ${sameRepo})`);
               
@@ -133,7 +136,7 @@ jobs:
           ref: ${{ steps.pick.outputs.head_ref }}
           fetch-depth: 0
           persist-credentials: true
-          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN != '' && secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup git identity
         run: |
@@ -187,12 +190,19 @@ jobs:
           fi
 
       - name: Collect failed job details
-        if: github.event_name == 'workflow_run'
+        if: github.event_name == 'workflow_run' || steps.pick.outputs.force == 'true'
         id: details
         uses: actions/github-script@v7
         with:
           script: |
             try {
+              if (context.eventName === 'workflow_dispatch' && '${{ steps.pick.outputs.force }}' === 'true') {
+                core.info('Force run: treating as if all jobs need review');
+                core.setOutput('failed', JSON.stringify(['(manual)']));
+                core.setOutput('failed_details', JSON.stringify([]));
+                return;
+              }
+
               const run_id = context.payload.workflow_run.id;
               
               // Get all jobs for the failed workflow run
