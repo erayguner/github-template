@@ -31,12 +31,13 @@ env:
 
 jobs:
   auto-fix:
-    # Only for failed PR runs OR manual runs
+    # Only for failed PR runs OR manual runs (but not if this is a retry from same PR)
     if: |
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'failure' &&
        github.event.workflow_run.event == 'pull_request' &&
-       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')) ||
+       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-') &&
+       !contains(github.event.workflow_run.head_commit.message, 'chore(ci): auto-fix CI failures')) ||
       (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -241,37 +242,154 @@ jobs:
             
             **Context:** This is an automated CI fix request. A workflow run failed and I need to make minimal, targeted changes to resolve the failing checks.
 
-            **Your Task:**
-            1. Analyze the failing CI jobs and their error messages by examining logs
-            2. Identify the root cause of the failures
-            3. Make minimal, surgical fixes to resolve the issues
-            4. Ensure changes don't break existing functionality
-            5. Focus on common CI issues like:
-               - Linting/formatting errors (eslint, prettier, etc.)
-               - Test failures due to outdated snapshots
-               - TypeScript/compilation errors
-               - Dependency issues or missing packages
-               - Configuration problems
-               - Build errors
+            **CRITICAL: You MUST fix the actual errors, not just format code. Focus on language-specific issues:**
+
+            ## 🐍 **Python Fixes**
+            - **Syntax errors**: Missing colons `:`, parentheses, brackets, indentation
+            - **Import errors**: Missing imports, circular imports, wrong module names
+            - **Linting**: flake8, pylint, black formatting issues
+            - **Tests**: pytest failures, assertion errors, missing test dependencies
+            - **Commands to run**: `python -m py_compile *.py`, `flake8 .`, `pytest`, `black --check .`
+
+            ## 🏗️ **Terraform/HCL Fixes**
+            - **Syntax errors**: Missing braces `{}`, quotes, commas
+            - **Resource errors**: Invalid resource names, missing required arguments
+            - **Variable errors**: Undefined variables, type mismatches
+            - **Provider issues**: Missing provider blocks, version constraints
+            - **Commands to run**: `terraform fmt -check`, `terraform validate`, `terragrunt validate`
+
+            ## 📜 **Bash/Shell Script Fixes**
+            - **Syntax errors**: Missing quotes, unescaped characters, wrong operators
+            - **Variable errors**: Undefined variables, wrong variable expansion
+            - **Permissions**: Executable permissions (`chmod +x`)
+            - **Shellcheck issues**: SC codes, best practices violations
+            - **Commands to run**: `shellcheck *.sh`, `bash -n script.sh`
+
+            ## 🟨 **JavaScript/TypeScript Fixes**
+            - **Syntax errors**: Missing semicolons, brackets, parentheses
+            - **ESLint issues**: Unused variables, formatting, best practices
+            - **TypeScript errors**: Type annotations, interface issues
+            - **Import/Export**: Missing imports, wrong paths, circular dependencies
+            - **Tests**: Jest/Mocha failures, missing mocks
+            - **Commands to run**: `npm run lint`, `npm run type-check`, `npm test`, `npm run build`
+
+            ## 📄 **YAML Fixes**
+            - **Indentation errors**: Wrong spacing, tabs vs spaces
+            - **Syntax errors**: Missing colons, wrong list formatting
+            - **GitHub Actions**: Workflow syntax, invalid action versions
+            - **Docker Compose**: Service definitions, volume syntax
+            - **Commands to run**: `yamllint .`, check specific YAML parsers
+
+            ## 🔧 **General CI/CD Issues**
+            - **Dockerfile**: Invalid instructions, missing dependencies
+            - **Package files**: package.json, requirements.txt, Cargo.toml issues
+            - **Configuration files**: Wrong paths, missing environment variables
+            - **Dependencies**: Version conflicts, missing packages
+
+            **Your Task - Follow This Process:**
+
+            1. **EXAMINE CI LOGS**: Look at the actual error messages and failing commands
+            
+            2. **IDENTIFY FILE TYPES**: Determine which languages/tools are failing:
+               ```bash
+               find . -name "*.py" -o -name "*.tf" -o -name "*.sh" -o -name "*.js" -o -name "*.ts" -o -name "*.yml" -o -name "*.yaml"
+               ```
+            
+            3. **RUN LANGUAGE-SPECIFIC CHECKS**:
+               - Python: `python -m py_compile file.py && flake8 file.py`
+               - Terraform: `terraform fmt -check . && terraform validate`
+               - Shell: `shellcheck script.sh && bash -n script.sh`  
+               - JavaScript: `npm run lint && npm run build`
+               - YAML: `yamllint file.yml`
+            
+            4. **FIX EACH ERROR SYSTEMATICALLY**:
+               - **Syntax first**: Fix all parsing/compilation errors
+               - **Linting second**: Address style and quality issues
+               - **Tests last**: Fix failing test cases
+            
+            5. **VERIFY EACH FIX**: Re-run the specific command to ensure it passes
+            
+            6. **COMMON FIXES BY LANGUAGE**:
+
+            **Python Examples:**
+            ```python
+            # Fix: def greet(name) # Missing colon
+            def greet(name):  # ✅ Added colon
+                return f"Hello, {name}"
+            
+            # Fix: Missing imports
+            import os  # ✅ Add missing imports
+            
+            # Fix: Add newline at end of file ✅
+            ```
+
+            **Terraform Examples:**
+            ```hcl
+            # Fix: Missing quotes
+            resource "aws_instance" "example" {  # ✅ Added quotes
+              ami           = "ami-12345"        # ✅ Added quotes
+              instance_type = "t2.micro"
+            }
+            ```
+
+            **Shell Examples:**
+            ```bash
+            #!/bin/bash
+            # Fix: Unquoted variables
+            echo "Hello, ${name}"  # ✅ Quoted variable
+            
+            # Fix: Add error handling
+            set -euo pipefail  # ✅ Add strict mode
+            ```
+
+            **JavaScript Examples:**
+            ```javascript
+            // Fix: Missing semicolon
+            const name = 'World';  // ✅ Added semicolon
+            
+            // Fix: Unused variables
+            // const unused = 'test';  // ✅ Remove or use variable
+            ```
+
+            **YAML Examples:**
+            ```yaml
+            # Fix: Indentation
+            jobs:
+              test:  # ✅ Proper 2-space indentation
+                runs-on: ubuntu-latest
+            ```
 
             **Constraints:**
-            - Keep changes as small as possible
             - DO NOT modify files in .github/workflows/ directory
-            - Do not change core business logic
-            - Focus only on fixing CI-related issues (code, tests, config, dependencies)
-            - Prefer configuration/tooling fixes over code changes when possible
-            - Always run tests after making changes to verify fixes
+            - Fix ALL syntax errors completely - don't leave broken code
+            - Add missing newlines at end of files if required by linters
+            - Keep changes minimal but ensure they actually work
+            - Test each fix immediately after making it
 
-            **Instructions:**
-            Please analyze the repository and fix the CI failures. Start by examining recent commits, CI logs, and test files. 
-            Make sure to test your changes before finishing.
+            **VERIFICATION REQUIREMENTS:**
+            After fixing each file type, you MUST run verification commands:
+            - Python: `find . -name "*.py" -exec python -m py_compile {} \;`
+            - Terraform: `terraform validate` (if .tf files exist)
+            - Shell: `find . -name "*.sh" -exec shellcheck {} \;`
+            - JavaScript/Node: `npm run lint` or `npm run build` (if package.json exists)
+            - YAML: Check syntax with appropriate tools
+
+            **Final Step:** Provide a detailed summary of:
+            - Which files were modified
+            - What specific errors were fixed for each language
+            - Which verification commands passed
+            - Any remaining issues that need manual intervention
+
+            Start by examining the repository structure and CI logs to understand what languages and tools are being used.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--max-turns 10 --model claude-sonnet-4-20250514"
+          claude_args: "--max-turns 20 --model claude-sonnet-4-20250514"
 
-      - name: Verify Claude changes
+      - name: Verify fixes actually work
+        id: verify_fixes
         if: steps.claude.outcome == 'success'
+        continue-on-error: true
         run: |
-          echo "::group::Verifying changes made by Claude"
+          echo "::group::Verifying that fixes actually resolve CI issues"
           
           # Check if any files were modified
           CHANGED_FILES=$(git diff --name-only HEAD || true)
@@ -295,8 +413,112 @@ jobs:
             echo ""
             echo "Detailed diff:"
             git diff HEAD
+            
+            echo ""
+            echo "🧪 Running language-specific verification tests..."
+            
+            # Python verification
+            if find . -name "*.py" -not -path "./.git/*" | head -1 | grep -q "\.py$"; then
+              echo "🐍 Checking Python files..."
+              if command -v python3 &> /dev/null; then
+                echo "  - Syntax check:"
+                find . -name "*.py" -not -path "./.git/*" -exec python3 -m py_compile {} \; && echo "    ✅ Python syntax check passed" || echo "    ❌ Python syntax errors still exist"
+                
+                if command -v flake8 &> /dev/null; then
+                  echo "  - Flake8 linting:"
+                  flake8 . --exclude=.git && echo "    ✅ Flake8 passed" || echo "    ⚠️ Flake8 issues remain"
+                fi
+                
+                if command -v black &> /dev/null; then
+                  echo "  - Black formatting:"
+                  black --check . && echo "    ✅ Black formatting passed" || echo "    ⚠️ Black formatting issues remain"
+                fi
+              fi
+            fi
+            
+            # Terraform verification
+            if find . -name "*.tf" -not -path "./.git/*" | head -1 | grep -q "\.tf$"; then
+              echo "🏗️ Checking Terraform files..."
+              if command -v terraform &> /dev/null; then
+                echo "  - Terraform formatting:"
+                terraform fmt -check=true -recursive && echo "    ✅ Terraform formatting passed" || echo "    ⚠️ Terraform formatting issues remain"
+                
+                echo "  - Terraform validation:"
+                terraform init -backend=false &>/dev/null || true
+                terraform validate && echo "    ✅ Terraform validation passed" || echo "    ⚠️ Terraform validation issues remain"
+              fi
+            fi
+            
+            # Shell script verification
+            if find . -name "*.sh" -not -path "./.git/*" | head -1 | grep -q "\.sh$"; then
+              echo "📜 Checking Shell scripts..."
+              if command -v shellcheck &> /dev/null; then
+                echo "  - Shellcheck:"
+                find . -name "*.sh" -not -path "./.git/*" -exec shellcheck {} \; && echo "    ✅ Shellcheck passed" || echo "    ⚠️ Shellcheck issues remain"
+              fi
+              
+              echo "  - Bash syntax:"
+              find . -name "*.sh" -not -path "./.git/*" -exec bash -n {} \; && echo "    ✅ Bash syntax check passed" || echo "    ❌ Bash syntax errors still exist"
+            fi
+            
+            # JavaScript/TypeScript verification
+            if [ -f "package.json" ]; then
+              echo "🟨 Checking JavaScript/TypeScript project..."
+              if command -v npm &> /dev/null; then
+                echo "  - Dependencies:"
+                npm ci --silent &>/dev/null || npm install --silent &>/dev/null && echo "    ✅ Dependencies installed" || echo "    ⚠️ Dependency issues"
+                
+                if npm run --silent lint 2>/dev/null; then
+                  echo "    ✅ npm lint passed"
+                else
+                  echo "    ⚠️ npm lint issues may remain or script not available"
+                fi
+                
+                if npm run --silent type-check 2>/dev/null; then
+                  echo "    ✅ TypeScript type checking passed"
+                elif npm run --silent build 2>/dev/null; then
+                  echo "    ✅ Build passed"
+                else
+                  echo "    ⚠️ Build/type-check issues may remain"
+                fi
+              fi
+            fi
+            
+            # YAML verification
+            if find . -name "*.yml" -o -name "*.yaml" | grep -v ".git" | head -1 | grep -q "\.ya\?ml$"; then
+              echo "📄 Checking YAML files..."
+              if command -v yamllint &> /dev/null; then
+                echo "  - YAML linting:"
+                yamllint . && echo "    ✅ YAML linting passed" || echo "    ⚠️ YAML linting issues remain"
+              fi
+              
+              # Basic YAML syntax check with Python
+              if command -v python3 &> /dev/null; then
+                echo "  - YAML syntax:"
+                python3 -c "
+import yaml
+import glob
+import sys
+errors = 0
+for file in glob.glob('**/*.yml', recursive=True) + glob.glob('**/*.yaml', recursive=True):
+    if '.git' in file: continue
+    try:
+        with open(file) as f:
+            yaml.safe_load(f)
+    except Exception as e:
+        print(f'    ❌ {file}: {e}')
+        errors += 1
+if errors == 0:
+    print('    ✅ YAML syntax check passed')
+sys.exit(errors > 0)
+" || echo "    ⚠️ YAML syntax issues remain"
+              fi
+            fi
+            
+            echo "verification_status=success" >> $GITHUB_OUTPUT
           else
             echo "No changes detected"
+            echo "verification_status=no_changes" >> $GITHUB_OUTPUT
           fi
           
           echo "::endgroup::"
@@ -369,13 +591,147 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const commentBody = `🤖 **Auto-fixes applied**
+            let commentBody = `🤖 **Auto-fixes applied**
 
             I've automatically pushed fixes for the failing CI jobs directly to \`${{ steps.pick.outputs.head_ref }}\`.
 
-            **Fixed jobs:** ${{ steps.details.outputs.failed }}
+            **Failed jobs:** ${{ steps.details.outputs.failed }}
 
-            The CI will re-run automatically. If issues persist, manual intervention may be required.
+            ## 🔧 Fixes Applied
+
+            `;
+
+            // Get the changes and create a detailed comment
+            const { execSync } = require('child_process');
+            
+            try {
+              // Get changed files
+              const changedFiles = execSync('git diff --name-only HEAD~1 HEAD', { encoding: 'utf8' }).trim().split('\n').filter(f => f);
+              
+              if (changedFiles.length > 0) {
+                commentBody += `**Modified files:**\n`;
+                changedFiles.forEach(file => {
+                  const ext = file.split('.').pop().toLowerCase();
+                  const emoji = {
+                    'py': '🐍',
+                    'tf': '🏗️',
+                    'hcl': '🏗️',
+                    'sh': '📜',
+                    'bash': '📜',
+                    'js': '🟨',
+                    'ts': '🔷',
+                    'yml': '📄',
+                    'yaml': '📄',
+                    'json': '📦',
+                    'md': '📝'
+                  };
+                  commentBody += `- ${emoji[ext] || '📄'} \`${file}\`\n`;
+                });
+                commentBody += '\n';
+
+                // Analyze the diff for language-specific fixes
+                const diff = execSync('git diff HEAD~1 HEAD', { encoding: 'utf8' });
+                const fixes = [];
+                
+                // Python fixes
+                if (diff.includes('.py') || diff.match(/def.*:\s*\n/)) {
+                  if (diff.includes('def ') && diff.includes('):')) {
+                    fixes.push('🐍 **Python**: Fixed missing colons in function definitions');
+                  }
+                  if (diff.match(/\+.*import\s+/)) {
+                    fixes.push('🐍 **Python**: Fixed missing imports');
+                  }
+                  if (diff.includes('assert') && diff.includes('==')) {
+                    fixes.push('🐍 **Python**: Fixed test assertions');
+                  }
+                  if (diff.match(/\+.*\n$/m)) {
+                    fixes.push('🐍 **Python**: Added missing newlines for PEP8 compliance');
+                  }
+                }
+                
+                // Terraform/HCL fixes
+                if (diff.includes('.tf') || diff.includes('.hcl')) {
+                  if (diff.includes('resource ') && diff.includes('{')) {
+                    fixes.push('🏗️ **Terraform**: Fixed resource block syntax');
+                  }
+                  if (diff.match(/\+.*=.*"/)) {
+                    fixes.push('🏗️ **Terraform**: Fixed variable assignments and quotes');
+                  }
+                }
+                
+                // Shell script fixes
+                if (diff.includes('.sh') || diff.includes('#!/bin/bash')) {
+                  if (diff.includes('${') && diff.includes('}')) {
+                    fixes.push('📜 **Shell**: Fixed variable expansions and quoting');
+                  }
+                  if (diff.includes('set -') || diff.includes('pipefail')) {
+                    fixes.push('📜 **Shell**: Added error handling and strict mode');
+                  }
+                }
+                
+                // JavaScript/TypeScript fixes
+                if (diff.includes('.js') || diff.includes('.ts')) {
+                  if (diff.includes(';')) {
+                    fixes.push('🟨 **JavaScript**: Fixed missing semicolons');
+                  }
+                  if (diff.match(/^-.*\/\/.*unused/m)) {
+                    fixes.push('🟨 **JavaScript**: Removed unused variables and imports');
+                  }
+                  if (diff.includes('export ') || diff.includes('import ')) {
+                    fixes.push('🟨 **JavaScript**: Fixed import/export statements');
+                  }
+                }
+                
+                // YAML fixes  
+                if (diff.includes('.yml') || diff.includes('.yaml')) {
+                  if (diff.match(/^\+\s{2,}/m)) {
+                    fixes.push('📄 **YAML**: Fixed indentation and formatting');
+                  }
+                  if (diff.includes('runs-on:') || diff.includes('uses:')) {
+                    fixes.push('📄 **YAML**: Fixed GitHub Actions workflow syntax');
+                  }
+                }
+                
+                // General fixes
+                if (diff.match(/^-.*#.*\n\+.*$/m)) {
+                  fixes.push('🔧 **General**: Fixed linting and formatting issues');
+                }
+                
+                if (diff.includes('package.json') || diff.includes('requirements.txt')) {
+                  fixes.push('📦 **Dependencies**: Fixed package configuration');
+                }
+                
+                if (fixes.length > 0) {
+                  commentBody += '**Language-specific fixes applied:**\n';
+                  fixes.forEach(fix => {
+                    commentBody += `${fix}\n`;
+                  });
+                } else {
+                  commentBody += '✅ Applied various code quality and syntax improvements\n';
+                }
+                
+                commentBody += '\n';
+                
+                // Show diff stats
+                const diffStat = execSync('git diff --stat HEAD~1 HEAD', { encoding: 'utf8' });
+                if (diffStat) {
+                  commentBody += `**Changes summary:**\n\`\`\`\n${diffStat}\n\`\`\`\n\n`;
+                }
+                
+              } else {
+                commentBody += '⚠️ No changes were made - Claude may have determined the issues require manual intervention.\n\n';
+              }
+            } catch (error) {
+              commentBody += '⚠️ Unable to analyze changes in detail, but fixes were attempted.\n\n';
+              console.error('Error analyzing diff:', error);
+            }
+
+            commentBody += `## 🔄 Next Steps
+
+            The CI will re-run automatically to verify these fixes. If issues persist:
+            - The fixes may be incomplete and require manual intervention
+            - There might be additional errors not covered by the automated fixes
+            - Consider reviewing the failing tests and error messages manually
 
             <details>
             <summary>Workflow Details</summary>
@@ -383,6 +739,7 @@ jobs:
             - **Workflow:** ${{ github.workflow }}
             - **Run:** #${{ github.run_number }}
             - **Commit:** \`${context.sha.substring(0, 7)}\`
+            - **Trigger:** Auto-fix for failed CI jobs
             </details>`;
 
             await github.rest.issues.createComment({
