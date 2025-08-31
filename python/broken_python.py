@@ -2,6 +2,7 @@
 
 # --- Syntax Error ---
 def greet(name)   # Missing colon
+
     return f"Hello, {name}"
 
 
