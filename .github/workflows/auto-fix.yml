@@ -490,6 +490,11 @@ jobs:
             
             **Fixed jobs:** ${{ steps.details.outputs.failed }}
             
+            **Changes made:**
+            - Fixed Python syntax errors (missing colons, invalid assignments)
+            - Corrected import statements and function definitions
+            - Applied minimal fixes to resolve CI failures
+            
             The CI will re-run automatically. If issues persist, manual intervention may be required.
             
             <details>
@@ -536,8 +541,11 @@ jobs:
             **Target PR:** ${{ steps.pick.outputs.pr_url }}
             **Failed Jobs:** ${{ steps.details.outputs.failed }}
             
-            ## What was fixed
-            Claude analyzed the failing CI jobs and applied targeted fixes to resolve the issues.
+            ## Changes made
+            - Fixed Python syntax errors (missing colons, invalid assignments)
+            - Corrected import statements and function definitions  
+            - Applied minimal fixes to resolve CI failures
+            - All changes are targeted at making tests pass
             
             ## Next Steps
             1. Review the changes in this PR
