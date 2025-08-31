@@ -2,8 +2,22 @@ name: Auto Fix CI Failures
 
 on:
   workflow_run:
-    workflows: ["Basic CI"]   # must exactly match your CI workflow name
+    workflows: ["Basic CI"]        # TODO: Update this to match your CI workflow name exactly
     types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_branch:
+        description: "PR head branch (for manual testing; same-repo only)"
+        required: false
+      base_branch:
+        description: "Base branch (default: main)"
+        required: false
+        default: "main"
+      force_run:
+        description: "Force run even if no failures detected"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -11,44 +25,111 @@ permissions:
   actions: read
   id-token: write
 
+env:
+  MAX_RETRY_ATTEMPTS: 3
+  CLEANUP_THRESHOLD: 10  # Keep only last 10 fix branches
+
 jobs:
   auto-fix:
-    # run only for failed PR runs; avoid loops on our own auto-fix branches
+    # Only for failed PR runs OR manual runs
     if: |
-      github.event.workflow_run.conclusion == 'failure' &&
-      github.event.workflow_run.event == 'pull_request' &&
-      !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'failure' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       !startsWith(github.event.workflow_run.head_branch, 'claude-auto-fix-ci-')) ||
+      (github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
+    timeout-minutes: 30
 
     steps:
+      - name: Print triggering context (debug)
+        run: |
+          echo "::group::Trigger Context"
+          echo "event_name=${{ github.event_name }}"
+          echo "repository=${{ github.repository }}"
+          echo "run_id=${{ github.run_id }}"
+          echo "run_number=${{ github.run_number }}"
+          
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            echo "workflow_run.name=${{ github.event.workflow_run.name }}"
+            echo "workflow_run.conclusion=${{ github.event.workflow_run.conclusion }}"
+            echo "workflow_run.event=${{ github.event.workflow_run.event }}"
+            echo "workflow_run.head_branch=${{ github.event.workflow_run.head_branch }}"
+            echo "workflow_run.id=${{ github.event.workflow_run.id }}"
+          else
+            echo "manual pr_branch=${{ inputs.pr_branch }}"
+            echo "manual base_branch=${{ inputs.base_branch }}"
+            echo "manual force_run=${{ inputs.force_run }}"
+          fi
+          echo "::endgroup::"
+
       - name: Verify Claude API key exists
         run: |
           if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] && [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
-            echo "::error::Missing ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN)."
+            echo "::error::Missing required API keys. Please set either ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN in repository secrets."
+            echo "::error::Visit: https://github.com/${{ github.repository }}/settings/secrets/actions"
             exit 1
           fi
+          echo "✅ API key configuration verified"
 
-      - name: Get PR details
-        id: pr
+      - name: Determine PR and branches
+        id: pick
         uses: actions/github-script@v7
         with:
           script: |
-            const run = context.payload.workflow_run;
-            const prLite = run.pull_requests && run.pull_requests[0];
-            if (!prLite) core.setFailed('No PR found on workflow_run payload.');
-            const { data: pr } = await github.rest.pulls.get({
-              owner: context.repo.owner, repo: context.repo.repo, pull_number: prLite.number
-            });
-            const sameRepo = pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
-            core.setOutput('number', pr.number.toString());
-            core.setOutput('same_repo', sameRepo ? 'true' : 'false');
-            core.setOutput('head_ref', pr.head.ref);
-            core.setOutput('base_ref', pr.base.ref);
+            try {
+              if (context.eventName === 'workflow_dispatch') {
+                const prBranch = '${{ inputs.pr_branch }}';
+                const baseBranch = '${{ inputs.base_branch }}' || 'main';
+                
+                if (!prBranch) {
+                  core.setFailed('For manual run, pr_branch input is required.');
+                  return;
+                }
+                
+                core.setOutput('head_ref', prBranch);
+                core.setOutput('base_ref', baseBranch);
+                core.setOutput('number', '');
+                core.setOutput('same_repo', 'true');
+                core.setOutput('pr_url', '');
+                core.info(`Manual run: ${prBranch} -> ${baseBranch}`);
+                return;
+              }
 
-      - name: Checkout PR head
+              // workflow_run path
+              const run = context.payload.workflow_run;
+              const prLite = run.pull_requests && run.pull_requests[0];
+              
+              if (!prLite) {
+                core.setFailed('No PR associated with this workflow run. This might be a push to main branch.');
+                return;
+              }
+
+              // Fetch full PR details
+              const { data: pr } = await github.rest.pulls.get({
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                pull_number: prLite.number
+              });
+              
+              const sameRepo = pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
+              
+              core.setOutput('head_ref', pr.head.ref);
+              core.setOutput('base_ref', pr.base.ref);
+              core.setOutput('number', pr.number.toString());
+              core.setOutput('same_repo', sameRepo ? 'true' : 'false');
+              core.setOutput('pr_url', pr.html_url);
+              
+              core.info(`PR #${pr.number}: ${pr.head.ref} -> ${pr.base.ref} (same_repo: ${sameRepo})`);
+              
+            } catch (error) {
+              core.setFailed(`Failed to determine PR details: ${error.message}`);
+            }
+
+      - name: Checkout target branch
         uses: actions/checkout@v5
         with:
-          ref: ${{ steps.pr.outputs.head_ref }}
+          ref: ${{ steps.pick.outputs.head_ref }}
           fetch-depth: 0
           persist-credentials: true
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -57,131 +138,340 @@ jobs:
         run: |
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name  "github-actions[bot]"
+          git config --global init.defaultBranch main
 
-      - name: Decide fix branch
+      - name: Cleanup old fix branches
+        if: steps.pick.outputs.same_repo == 'false'
+        continue-on-error: true
+        run: |
+          echo "::group::Cleaning up old fix branches"
+          
+          # Get all claude-auto-fix branches, sorted by creation date (oldest first)
+          OLD_BRANCHES=$(git branch -r --sort=creatordate | grep "origin/claude-auto-fix-ci-" | head -n -${{ env.CLEANUP_THRESHOLD }} || true)
+          
+          if [ -n "$OLD_BRANCHES" ]; then
+            echo "Found old branches to cleanup:"
+            echo "$OLD_BRANCHES"
+            
+            echo "$OLD_BRANCHES" | while read -r branch; do
+              # Remove origin/ prefix and delete branch
+              BRANCH_NAME=${branch#origin/}
+              echo "Deleting branch: $BRANCH_NAME"
+              git push origin --delete "$BRANCH_NAME" || echo "Failed to delete $BRANCH_NAME"
+            done
+          else
+            echo "No old branches to cleanup"
+          fi
+          
+          echo "::endgroup::"
+
+      - name: Decide fix branch strategy
         id: branch
         run: |
-          if [ "${{ steps.pr.outputs.same_repo }}" = "true" ]; then
-            echo "branch=${{ steps.pr.outputs.head_ref }}" >> $GITHUB_OUTPUT
+          if [ "${{ steps.pick.outputs.same_repo }}" = "true" ]; then
+            echo "branch=${{ steps.pick.outputs.head_ref }}" >> $GITHUB_OUTPUT
             echo "mode=direct" >> $GITHUB_OUTPUT
+            echo "🔧 Will push fixes directly to: ${{ steps.pick.outputs.head_ref }}"
           else
-            FIX_BRANCH="claude-auto-fix-ci-${{ steps.pr.outputs.head_ref }}-${{ github.run_id }}"
+            # Create unique branch name with timestamp to avoid collisions
+            TIMESTAMP=$(date +%s)
+            FIX_BRANCH="claude-auto-fix-ci-${{ steps.pick.outputs.head_ref }}-${{ github.run_id }}-${TIMESTAMP}"
+            
+            echo "Creating fix branch: $FIX_BRANCH"
             git checkout -b "$FIX_BRANCH"
+            
             echo "branch=$FIX_BRANCH" >> $GITHUB_OUTPUT
             echo "mode=branch" >> $GITHUB_OUTPUT
+            echo "🔧 Created fix branch: $FIX_BRANCH"
           fi
 
-      - name: Collect failed job names
+      - name: Collect failed job details
+        if: github.event_name == 'workflow_run'
         id: details
         uses: actions/github-script@v7
         with:
           script: |
-            const run_id = context.payload.workflow_run.id;
-            const { data } = await github.rest.actions.listJobsForWorkflowRun({
-              owner: context.repo.owner, repo: context.repo.repo, run_id
-            });
-            const failed = data.jobs.filter(j => j.conclusion === 'failure').map(j => j.name);
-            core.setOutput('failed', JSON.stringify(failed));
+            try {
+              const run_id = context.payload.workflow_run.id;
+              
+              // Get all jobs for the failed workflow run
+              const { data } = await github.rest.actions.listJobsForWorkflowRun({
+                owner: context.repo.owner, 
+                repo: context.repo.repo, 
+                run_id
+              });
+              
+              const failed = data.jobs.filter(j => j.conclusion === 'failure');
+              const failedNames = failed.map(j => j.name);
+              const failedDetails = failed.map(j => ({
+                name: j.name,
+                steps: j.steps?.filter(s => s.conclusion === 'failure').map(s => ({
+                  name: s.name,
+                  conclusion: s.conclusion
+                })) || []
+              }));
+              
+              core.setOutput('failed', JSON.stringify(failedNames));
+              core.setOutput('failed_details', JSON.stringify(failedDetails));
+              
+              core.info(`Found ${failedNames.length} failed jobs: ${failedNames.join(', ')}`);
+              
+            } catch (error) {
+              core.setFailed(`Failed to collect job details: ${error.message}`);
+            }
 
-      # --- Ask Claude to make edits in-place ---
-      - name: Claude: attempt targeted CI fixes
+      - name: Create backup before Claude changes
+        run: |
+          echo "::group::Creating backup"
+          git stash push -m "backup-before-claude-$(date +%s)" --include-untracked || echo "Nothing to backup"
+          echo "::endgroup::"
+
+      - name: Claude - Attempt targeted CI fixes
         id: claude
+        continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
           prompt: |
-            /fix-ci
-            Repository: ${{ github.repository }}
-            Base Branch: ${{ steps.pr.outputs.base_ref }}
-            PR Branch: ${{ steps.pr.outputs.head_ref }}
-            Failed Jobs: ${{ steps.details.outputs.failed }}
-            Goal: Make minimal, correct edits to fix the failing CI checks.
-            Constraints: Keep changes small; do not change workflow names/triggers unless required to pass.
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY != '' && secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          # ensure editing is allowed (Claude writes inside workspace)
-          claude_args: "--allowedTools 'Edit(**),MultiEdit(**),Write(**),Grep(**),LS(**)'"
+            ## CI Auto-Fix Request
 
-      # --- Show what (if anything) changed ---
-      - name: Show working tree diff (debug)
-        if: always()
-        run: |
-          echo "Workspace: $GITHUB_WORKSPACE"
-          git status --porcelain=v1
-          git diff --name-only || true
+            **Repository:** ${{ github.repository }}
+            **Base Branch:** ${{ steps.pick.outputs.base_ref }}
+            **PR Branch:** ${{ steps.pick.outputs.head_ref }}
+            **Failed Jobs:** ${{ steps.details.outputs.failed || 'Manual run - check all potential issues' }}
+            
+            **Context:** This is an automated CI fix request. A workflow run failed and I need to make minimal, targeted changes to resolve the failing checks.
 
-      # --- Fallback auto-fix pass if Claude didn't edit files ---
-      - name: Install quick-fix tools (ruff/terraform/yamllint)
-        if: always()
-        run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck
-          python3 -m pip install --user ruff yamllint
-          echo "TOOLS READY"
+            **Your Task:**
+            1. Analyze the failing CI jobs and their error messages
+            2. Identify the root cause of the failures
+            3. Make minimal, surgical fixes to resolve the issues
+            4. Ensure changes don't break existing functionality
+            5. Focus on common CI issues like:
+               - Linting/formatting errors
+               - Test failures due to outdated snapshots
+               - Dependency issues
+               - Configuration problems
+               - Build errors
 
-      - name: Run fallback formatters
-        if: always()
+            **Constraints:**
+            - Keep changes as small as possible
+            - Do not modify workflow names or triggers unless absolutely necessary
+            - Do not change core business logic
+            - Focus only on fixing CI-related issues
+            - Prefer configuration/tooling fixes over code changes when possible
+
+            **Instructions:**
+            Please analyze the repository and fix the CI failures. Start by examining recent commits, CI configuration, and test files.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--allowedTools 'Edit(**),MultiEdit(**),Write(**),Grep(**),LS(**),Terminal(npm*,yarn*,pnpm*)'"
+
+      - name: Verify Claude changes
+        if: steps.claude.outcome == 'success'
         run: |
-          # Python quick-fix (if any .py present)
-          if git ls-files '*.py' | grep -q .; then
-            ~/.local/bin/ruff check --fix . || true
-            ~/.local/bin/ruff format . || true
+          echo "::group::Verifying changes made by Claude"
+          
+          # Check if any files were modified
+          CHANGED_FILES=$(git diff --name-only HEAD || true)
+          STAGED_FILES=$(git diff --staged --name-only || true)
+          UNTRACKED_FILES=$(git ls-files --others --exclude-standard || true)
+          
+          echo "Modified files:"
+          echo "${CHANGED_FILES:-None}"
+          echo ""
+          echo "Staged files:"
+          echo "${STAGED_FILES:-None}"
+          echo ""
+          echo "Untracked files:"
+          echo "${UNTRACKED_FILES:-None}"
+          
+          # Show a summary of changes
+          if [ -n "$CHANGED_FILES" ] || [ -n "$STAGED_FILES" ] || [ -n "$UNTRACKED_FILES" ]; then
+            echo ""
+            echo "Summary of changes:"
+            git status --porcelain=v1
+            echo ""
+            echo "Detailed diff:"
+            git diff HEAD
+          else
+            echo "No changes detected"
           fi
-          # YAML quick-fix (relaxed; non-blocking)
-          if git ls-files '*.yml' '*.yaml' | grep -q .; then
-            ~/.local/bin/yamllint -d "{extends: relaxed}" . || true
-          fi
-          # Terraform fmt (if present)
-          if git ls-files '*.tf' | grep -q .; then
-            terraform -version || true
-            terraform fmt -recursive || true
-          fi
+          
+          echo "::endgroup::"
 
-      - name: Commit and push changes (if any)
+      - name: Handle Claude failure
+        if: steps.claude.outcome == 'failure'
         run: |
+          echo "::warning::Claude failed to make fixes. This could be due to:"
+          echo "- Complex issues requiring human intervention"
+          echo "- API rate limits or connectivity issues"  
+          echo "- Repository structure that Claude couldn't understand"
+          echo ""
+          echo "Manual investigation may be required."
+          
+          # Restore backup if it exists
+          git stash pop || echo "No backup to restore"
+
+      - name: Commit and push changes
+        if: steps.claude.outcome == 'success'
+        run: |
+          echo "::group::Committing changes"
+          
+          # Stage all changes
           git add -A
+          
+          # Check if there are changes to commit
           if git diff --staged --quiet; then
-            echo "No changes to commit."; exit 0
+            echo "::notice::No changes to commit - Claude may have determined no fixes were needed"
+            exit 0
           fi
-          git commit -m "chore(ci): auto-fix CI failures"
-          git push -u origin "${{ steps.branch.outputs.branch }}"
+          
+          # Create detailed commit message
+          COMMIT_MSG="chore(ci): auto-fix CI failures
 
-      - name: Comment (direct push case)
-        if: steps.branch.outputs.mode == 'direct'
+          Auto-generated fixes for failing CI jobs:
+          ${{ steps.details.outputs.failed || 'Manual run' }}
+          
+          Generated by: ${{ github.workflow }} #${{ github.run_number }}
+          Triggered by: ${{ github.event_name }}
+          Repository: ${{ github.repository }}"
+          
+          git commit -m "$COMMIT_MSG"
+          
+          # Push with retry logic
+          for i in $(seq 1 ${{ env.MAX_RETRY_ATTEMPTS }}); do
+            if git push -u origin "${{ steps.branch.outputs.branch }}"; then
+              echo "✅ Successfully pushed changes (attempt $i)"
+              break
+            else
+              echo "⚠️  Push failed (attempt $i/${{ env.MAX_RETRY_ATTEMPTS }})"
+              if [ $i -lt ${{ env.MAX_RETRY_ATTEMPTS }} ]; then
+                echo "Retrying in 5 seconds..."
+                sleep 5
+                git pull --rebase origin "${{ steps.branch.outputs.branch }}" || true
+              else
+                echo "::error::Failed to push after ${{ env.MAX_RETRY_ATTEMPTS }} attempts"
+                exit 1
+              fi
+            fi
+          done
+          
+          echo "::endgroup::"
+
+      - name: Comment on original PR (direct push)
+        if: |
+          github.event_name == 'workflow_run' && 
+          steps.branch.outputs.mode == 'direct' && 
+          steps.pick.outputs.number != '' &&
+          steps.claude.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
+            const commentBody = `🤖 **Auto-fixes applied**
+
+            I've automatically pushed fixes for the failing CI jobs directly to \`${{ steps.pick.outputs.head_ref }}\`.
+
+            **Fixed jobs:** ${{ steps.details.outputs.failed }}
+
+            The CI will re-run automatically. If issues persist, manual intervention may be required.
+
+            <details>
+            <summary>Workflow Details</summary>
+            
+            - **Workflow:** ${{ github.workflow }}
+            - **Run:** #${{ github.run_number }}
+            - **Commit:** \`${context.sha.substring(0, 7)}\`
+            </details>`;
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: Number('${{ steps.pr.outputs.number }}'),
-              body: "🤖 Auto-fixes pushed directly to `${{ steps.pr.outputs.head_ref }}`; CI will re-run."
+              issue_number: Number('${{ steps.pick.outputs.number }}'),
+              body: commentBody
             });
 
-      - name: Open PR for fixes (fork case)
-        if: steps.branch.outputs.mode == 'branch'
+      - name: Create PR for fixes (fork case)
+        if: steps.branch.outputs.mode == 'branch' && steps.claude.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
             const head = "${{ steps.branch.outputs.branch }}";
-            const base = "${{ steps.pr.outputs.base_ref }}";
+            const base = "${{ steps.pick.outputs.base_ref }}";
+            
+            // Check if PR already exists
             const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner, repo: context.repo.repo, state: 'open',
+              owner: context.repo.owner, 
+              repo: context.repo.repo, 
+              state: 'open',
               head: `${context.repo.owner}:${head}`
             });
-            if (!prs.length) {
+            
+            if (prs.length > 0) {
+              core.info(`PR already exists: ${prs[0].html_url}`);
+              return;
+            }
+            
+            // Create new PR
+            const prBody = `🤖 **Automated CI Fixes**
+
+            This PR contains automated fixes for failing CI jobs in the original PR.
+
+            **Target PR:** ${{ steps.pick.outputs.pr_url }}
+            **Failed Jobs:** ${{ steps.details.outputs.failed }}
+
+            ## What was fixed
+            Claude analyzed the failing CI jobs and applied targeted fixes to resolve the issues.
+
+            ## Next Steps
+            1. Review the changes in this PR
+            2. If approved, merge this PR
+            3. The fixes will be available for the original PR
+
+            ---
+            *Generated by ${{ github.workflow }} #${{ github.run_number }}*`;
+            
+            try {
               const { data: pr } = await github.rest.pulls.create({
-                owner: context.repo.owner, repo: context.repo.repo,
-                title: "chore(ci): auto-fix CI failures", head, base,
-                body: "Automated fixes for failing CI."
+                owner: context.repo.owner, 
+                repo: context.repo.repo,
+                title: `chore(ci): auto-fix CI failures for ${{ steps.pick.outputs.head_ref }}`,
+                head: head,
+                base: base,
+                body: prBody
               });
-              core.info(`Opened PR: ${pr.html_url}`);
+              
+              core.info(`✅ Created fix PR: ${pr.html_url}`);
+              
+              // Add labels if they exist
+              try {
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: pr.number,
+                  labels: ['automated', 'ci-fix', 'claude-generated']
+                });
+              } catch (labelError) {
+                core.info('Could not add labels (labels may not exist)');
+              }
+              
+            } catch (error) {
+              core.setFailed(`Failed to create PR: ${error.message}`);
             }
 
-      - name: Leave note on original PR (fork case)
-        if: steps.branch.outputs.mode == 'branch'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.issues.createComment({
-              owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: Number('${{ steps.pr.outputs.number }}'),
-              body: "🤖 Pushed auto-fix branch `${{ steps.branch.outputs.branch }}` and opened a PR toward `${{ steps.pr.outputs.base_ref }}`."
-            })
+      - name: Summary
+        if: always()
+        run: |
+          echo "::group::Workflow Summary"
+          echo "Event: ${{ github.event_name }}"
+          echo "Branch Strategy: ${{ steps.branch.outputs.mode }}"
+          echo "Target Branch: ${{ steps.branch.outputs.branch }}"
+          echo "Claude Status: ${{ steps.claude.outcome }}"
+          echo "PR Number: ${{ steps.pick.outputs.number }}"
+          echo "::endgroup::"
+          
+          if [ "${{ steps.claude.outcome }}" = "success" ]; then
+            echo "✅ Workflow completed successfully"
+          elif [ "${{ steps.claude.outcome }}" = "failure" ]; then
+            echo "⚠️  Claude fixes failed - manual intervention may be required"
+          else
+            echo "ℹ️  Workflow completed with mixed results"
+          fi
