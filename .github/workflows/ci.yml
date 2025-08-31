@@ -69,23 +69,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # -------- CodeQL (Python only; skip if no Python) --------
-      - name: Initialize CodeQL (Python)
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
+      # -------- CodeQL Analysis --------
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: python
-          # Point CodeQL to typical src layout (adjust if needed)
-          source-root: ./python
           queries: +security-extended
 
-      # For Python, no autobuild is required
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
 
-      - name: Perform CodeQL Analysis (Python)
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
+      - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
-        with:
-          category: "/language:python"
 
       # -------- Secret scanning --------
       - name: Secret scanning (trufflehog)
