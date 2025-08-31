@@ -24,6 +24,4 @@ def multiply(a, b):
 
 # --- Fake test function ---
 def test_multiply():
-
-
     assert multiply(3, 4) == 12  # Will fail
