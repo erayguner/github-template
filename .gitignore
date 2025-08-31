@@ -323,3 +323,4 @@ CLAUDE.md
 
 ruv-swarm*
 output.txt
+/.claude-flow/metrics/system-metrics.json
