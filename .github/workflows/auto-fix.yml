@@ -24,7 +24,6 @@ permissions:
   pull-requests: write
   actions: read
   id-token: write
-  workflows: write
 
 env:
   MAX_RETRY_ATTEMPTS: 3
@@ -233,7 +232,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           prompt: |
-            ## CI Auto-Fix Request
+            ## /fix-ci
 
             **Repository:** ${{ github.repository }}
             **Base Branch:** ${{ steps.pick.outputs.base_ref }}
@@ -243,28 +242,31 @@ jobs:
             **Context:** This is an automated CI fix request. A workflow run failed and I need to make minimal, targeted changes to resolve the failing checks.
 
             **Your Task:**
-            1. Analyze the failing CI jobs and their error messages
+            1. Analyze the failing CI jobs and their error messages by examining logs
             2. Identify the root cause of the failures
             3. Make minimal, surgical fixes to resolve the issues
             4. Ensure changes don't break existing functionality
             5. Focus on common CI issues like:
-               - Linting/formatting errors
+               - Linting/formatting errors (eslint, prettier, etc.)
                - Test failures due to outdated snapshots
-               - Dependency issues
+               - TypeScript/compilation errors
+               - Dependency issues or missing packages
                - Configuration problems
                - Build errors
 
             **Constraints:**
             - Keep changes as small as possible
-            - Do not modify workflow names or triggers unless absolutely necessary
+            - DO NOT modify files in .github/workflows/ directory
             - Do not change core business logic
-            - Focus only on fixing CI-related issues
+            - Focus only on fixing CI-related issues (code, tests, config, dependencies)
             - Prefer configuration/tooling fixes over code changes when possible
+            - Always run tests after making changes to verify fixes
 
             **Instructions:**
-            Please analyze the repository and fix the CI failures. Start by examining recent commits, CI configuration, and test files.
+            Please analyze the repository and fix the CI failures. Start by examining recent commits, CI logs, and test files. 
+            Make sure to test your changes before finishing.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: "--allowedTools 'Edit(**),MultiEdit(**),Write(**),Grep(**),LS(**),Terminal(npm*,yarn*,pnpm*)'"
+          claude_args: "--max-turns 10 --model claude-sonnet-4-20250514"
 
       - name: Verify Claude changes
         if: steps.claude.outcome == 'success'
