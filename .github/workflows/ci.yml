@@ -35,6 +35,13 @@ jobs:
         with:
           terraform_version: ~1.6.0
 
+      - name: Install linting tools
+        run: |
+          # Install shellcheck for bash linting
+          sudo apt-get update && sudo apt-get install -y shellcheck
+          # Install yamllint for YAML linting
+          pip install yamllint
+
       # -------- Python Linting & Security --------
       - name: Python linting and security
         if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
@@ -47,11 +54,11 @@ jobs:
           elif [[ -f "requirements.txt" ]]; then
             uv pip install -r requirements.txt || true
           fi
-          
+
           # Linting
           uv run ruff check .
           uv run ruff format --check .
-          
+
           # Security scanning
           uv pip install bandit || true
           uv run bandit -r src/ || true
@@ -65,9 +72,27 @@ jobs:
           terraform fmt -check -recursive .
           terraform init -backend=false
           terraform validate
-          
+
           # Security scanning
           tfsec . --format sarif --out tfsec.sarif
+
+      # -------- Bash Script Linting --------
+      - name: Bash script linting
+        if: hashFiles('**/*.sh', '**/*.bash') != ''
+        run: |
+          # Find and lint bash scripts (exclude node_modules, .venv, .git)
+          find . -name "*.sh" -o -name "*.bash" | grep -v -E "(node_modules|\.venv|\.git|vendor)" | while read -r script; do
+            echo "Linting: $script"
+            shellcheck "$script" || true
+          done
+
+      # -------- YAML Linting --------
+      - name: YAML linting
+        if: hashFiles('**/*.yml', '**/*.yaml') != ''
+        run: |
+          # Lint YAML files with basic config (exclude hidden dirs and venv)
+          yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
+            --ignore ".venv/*" --ignore "python/.venv/*" --ignore ".git/*" . || true
 
       # -------- CodeQL Analysis --------
       - name: Initialize CodeQL
