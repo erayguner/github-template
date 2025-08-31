@@ -132,7 +132,7 @@ jobs:
           ref: ${{ steps.pick.outputs.head_ref }}
           fetch-depth: 0
           persist-credentials: true
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Setup git identity
         run: |
