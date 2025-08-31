@@ -2,19 +2,18 @@ name: Auto Fix CI Failures
 
 on:
   workflow_run:
-    workflows: ["Basic CI"]   # must match your CI workflow name exactly
+    workflows: ["Basic CI"]   # Must exactly match your CI workflow name
     types: [completed]
 
 permissions:
-  contents: write          # to push a fix branch
-  pull-requests: write     # to comment / open PRs
-  actions: read            # to read job/run metadata
-  issues: write
-  id-token: write          # if your action needs OIDC, safe to keep
+  contents: write
+  pull-requests: write
+  actions: read
+  id-token: write
 
 jobs:
   auto-fix:
-    # Trigger only on failed PR runs, and avoid loops by branch prefix guard
+    # Run only for failed PR runs, avoid loops on our own auto-fix branches
     if: |
       github.event.workflow_run.conclusion == 'failure' &&
       github.event.workflow_run.event == 'pull_request' &&
@@ -22,12 +21,45 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout PR head
+      - name: Ensure Claude API key exists
+        run: |
+          if [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ] && [ -z "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "::error::Missing ANTHROPIC_API_KEY (or CLAUDE_CODE_OAUTH_TOKEN). Add it in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+
+      - name: Get PR details
+        id: pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const run = context.payload.workflow_run;
+            const pr = run.pull_requests && run.pull_requests[0];
+            if (!pr) {
+              core.setFailed('No PR found on workflow_run payload.');
+              return;
+            }
+
+            const prNum = pr.number;
+            const { data: prData } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNum
+            });
+
+            const sameRepo = prData.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
+            const headRef  = prData.head.ref;     // PR branch name
+            const baseRef  = prData.base.ref;     // base branch, e.g. main
+
+            core.setOutput('number', prNum.toString());
+            core.setOutput('same_repo', sameRepo ? 'true' : 'false');
+            core.setOutput('head_ref', headRef);
+            core.setOutput('base_ref', baseRef);
+
+      - name: Checkout target for fixes
         uses: actions/checkout@v5
         with:
-          # Checkout the exact branch that triggered Basic CI
-          repository: ${{ github.repository }}
-          ref: ${{ github.event.workflow_run.head_branch }}
+          ref: ${{ steps.pr.outputs.head_ref }}   # Checkout the PR branch
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -36,56 +68,49 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git config --global user.name  "github-actions[bot]"
 
-      - name: Create fix branch
+      - name: Decide fix branch
         id: branch
         run: |
-          BRANCH_NAME="claude-auto-fix-ci-${{ github.event.workflow_run.head_branch }}-${{ github.run_id }}"
-          git checkout -b "$BRANCH_NAME"
-          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+          if [ "${{ steps.pr.outputs.same_repo }}" = "true" ]; then
+            # We can push directly to the PR branch
+            echo "branch=${{ steps.pr.outputs.head_ref }}" >> $GITHUB_OUTPUT
+            echo "mode=direct" >> $GITHUB_OUTPUT
+          else
+            # Fork PR: create a new branch in our repo
+            FIX_BRANCH="claude-auto-fix-ci-${{ steps.pr.outputs.head_ref }}-${{ github.run_id }}"
+            git checkout -b "$FIX_BRANCH"
+            echo "branch=$FIX_BRANCH" >> $GITHUB_OUTPUT
+            echo "mode=branch" >> $GITHUB_OUTPUT
+          fi
 
-      - name: Collect failure details
+      - name: Collect failing job names (optional)
         id: details
         uses: actions/github-script@v7
         with:
           script: |
             const run_id = context.payload.workflow_run.id;
-            const { data: run } = await github.rest.actions.getWorkflowRun({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              run_id
-            });
-
             const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
               owner: context.repo.owner,
               repo: context.repo.repo,
               run_id
             });
+            const failed = jobs.jobs.filter(j => j.conclusion === 'failure').map(j => j.name);
+            core.setOutput('failed', JSON.stringify(failed));
 
-            const failed = jobs.jobs.filter(j => j.conclusion === 'failure');
-            return {
-              runUrl: run.html_url,
-              headSha: run.head_sha,
-              headBranch: run.head_branch,
-              prNum: (run.pull_requests && run.pull_requests[0]) ? run.pull_requests[0].number : null,
-              failedJobs: failed.map(j => j.name)
-            };
-
-      - name: Use Claude to fix CI
+      - name: Ask Claude to fix the CI
         uses: anthropics/claude-code-action@v1
         with:
           prompt: |
             /fix-ci
-            Failed CI Run: ${{ fromJSON(steps.details.outputs.result).runUrl }}
-            Failed Jobs: ${{ join(fromJSON(steps.details.outputs.result).failedJobs, ', ') }}
-            PR Number: ${{ fromJSON(steps.details.outputs.result).prNum }}
-            Branch Name: ${{ steps.branch.outputs.branch_name }}
-            Base Branch: ${{ github.event.workflow_run.head_branch }}
             Repository: ${{ github.repository }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # Keep tool access tight; expand if needed
+            Base Branch: ${{ steps.pr.outputs.base_ref }}
+            PR Branch: ${{ steps.pr.outputs.head_ref }}
+            Failed Jobs: ${{ steps.details.outputs.failed }}
+            Please modify files in-place to fix the CI failures.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY != '' && secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           claude_args: "--allowedTools 'Edit,Read,Write,Grep,LS'"
 
-      - name: Push fix branch
+      - name: Commit changes if any
         run: |
           git add -A
           if git diff --staged --quiet; then
@@ -93,32 +118,56 @@ jobs:
             exit 0
           fi
           git commit -m "chore(ci): auto-fix CI failures"
-          git push -u origin "${{ steps.branch.outputs.branch_name }}"
+          git push -u origin "${{ steps.branch.outputs.branch }}"
 
-      - name: Create or comment on PR
+      - name: Comment or open PR
+        if: steps.branch.outputs.mode == 'direct'
         uses: actions/github-script@v7
         with:
           script: |
-            const prNum = ${{ fromJSON(steps.details.outputs.result).prNum || 'null' }};
-            const head = "${{ steps.branch.outputs.branch_name }}";
-            const base = "${{ github.event.workflow_run.head_branch }}";
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number('${{ steps.pr.outputs.number }}'),
+              body: "🤖 Auto-fixes have been pushed directly to the PR branch `${{ steps.pr.outputs.head_ref }}`."
+            });
 
-            if (prNum && prNum !== 'null') {
-              // Comment on the original PR
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: prNum,
-                body: `🤖 Pushed auto-fix branch \`${head}\`. Please review.`
-              });
-            } else {
-              // Open a new PR if we can't find the original
-              await github.rest.pulls.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: "chore(ci): auto-fix CI failures",
-                head,
-                base,
-                body: "Automated fixes for failing CI."
-              });
+      - name: Open PR for fixes (fork case)
+        if: steps.branch.outputs.mode == 'branch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const head = "${{ steps.branch.outputs.branch }}";
+            const base = "${{ steps.pr.outputs.base_ref }}";
+            // If a PR from this head already exists, don't open another
+            const { data: prs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              head: `${context.repo.owner}:${head}`
+            });
+            if (prs.length) {
+              core.info(`PR already exists: ${prs[0].html_url}`);
+              return;
             }
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: "chore(ci): auto-fix CI failures",
+              head,
+              base,
+              body: "Automated fixes for failing CI."
+            });
+            core.info(`Opened PR: ${pr.html_url}`);
+
+      - name: Leave note on original PR (fork case)
+        if: steps.branch.outputs.mode == 'branch'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: Number('${{ steps.pr.outputs.number }}'),
+              body: "🤖 Pushed auto-fix branch `${{ steps.branch.outputs.branch }}` and opened a PR toward `${{ steps.pr.outputs.base_ref }}`."
+            });
