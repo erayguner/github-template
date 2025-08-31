@@ -1,0 +1,193 @@
+name: Test Claude Action
+
+on:
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode to run'
+        required: true
+        default: 'syntax_fix'
+        type: choice
+        options:
+          - 'syntax_fix'
+          - 'api_test'
+          - 'permission_test'
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+  id-token: write
+
+jobs:
+  test-claude-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup git identity
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name  "github-actions[bot]"
+
+      - name: Create test branch
+        run: |
+          TIMESTAMP=$(date +%s)
+          TEST_BRANCH="test-claude-fix-${TIMESTAMP}"
+          git checkout -b "$TEST_BRANCH"
+          echo "TEST_BRANCH=$TEST_BRANCH" >> $GITHUB_ENV
+
+      - name: Verify API key configuration
+        run: |
+          echo "::group::API Key Check"
+          if [ -n "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "✅ ANTHROPIC_API_KEY is set (length: ${#ANTHROPIC_API_KEY})"
+            echo "Key prefix: ${ANTHROPIC_API_KEY:0:8}..."
+          else
+            echo "❌ ANTHROPIC_API_KEY is not set"
+          fi
+          
+          if [ -n "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
+            echo "✅ CLAUDE_CODE_OAUTH_TOKEN is set"
+          else
+            echo "❌ CLAUDE_CODE_OAUTH_TOKEN is not set"
+          fi
+          echo "::endgroup::"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Pre-test analysis
+        run: |
+          echo "::group::Pre-test Analysis"
+          echo "Current git status:"
+          git status
+          
+          echo ""
+          echo "Python syntax check before Claude:"
+          python3 -c "
+          import ast
+          with open('python/broken_python.py', 'r') as f:
+              content = f.read()
+          print('File content length:', len(content))
+          try:
+              ast.parse(content)
+              print('❌ File has no syntax errors (unexpected)')
+          except SyntaxError as e:
+              print(f'✅ Expected syntax error found: {e}')
+          "
+          echo "::endgroup::"
+
+      - name: Test Claude Code Action with minimal prompt
+        id: claude_test
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          prompt: |
+            I need you to fix Python syntax errors in this repository.
+            
+            Please check the file `python/broken_python.py` and fix these specific issues:
+            1. Missing colon after function definitions
+            2. Invalid assignment syntax 
+            3. Import statement for non-existent module
+            
+            Make the minimal changes needed to make the Python file syntactically correct.
+            Start by reading the file and identifying the exact errors.
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: "--max-turns 10 --model claude-sonnet-4-20250514"
+
+      - name: Post-test analysis
+        if: always()
+        run: |
+          echo "::group::Post-test Analysis"
+          echo "Claude outcome: ${{ steps.claude_test.outcome }}"
+          echo "Claude conclusion: ${{ steps.claude_test.conclusion }}"
+          
+          echo ""
+          echo "Current git status after Claude:"
+          git status --porcelain
+          
+          echo ""
+          echo "File changes:"
+          git diff --name-only HEAD 2>/dev/null || echo "No changes detected"
+          
+          if git diff --quiet HEAD 2>/dev/null; then
+            echo "❌ NO FILES WERE MODIFIED BY CLAUDE"
+          else
+            echo "✅ Files were modified by Claude"
+            git diff HEAD
+          fi
+          
+          echo ""
+          echo "Python syntax check after Claude:"
+          python3 -c "
+          import ast
+          with open('python/broken_python.py', 'r') as f:
+              content = f.read()
+          try:
+              ast.parse(content)
+              print('✅ File syntax is now correct')
+          except SyntaxError as e:
+              print(f'❌ File still has syntax errors: {e}')
+              print('Current file content:')
+              print(content[:500])
+          "
+          echo "::endgroup::"
+
+      - name: Test direct file modification (fallback)
+        if: steps.claude_test.outcome == 'failure'
+        run: |
+          echo "::group::Testing Direct File Modification"
+          echo "Claude failed - testing if we can modify files manually..."
+          
+          # Make a simple test modification
+          echo "# Test modification - $(date)" >> python/broken_python.py
+          
+          if git diff --quiet; then
+            echo "❌ Cannot modify files - permission issue"
+          else
+            echo "✅ File modification works - issue is with Claude action"
+            git checkout python/broken_python.py  # Revert test change
+          fi
+          echo "::endgroup::"
+
+      - name: Debug Claude Code Action
+        if: always()
+        run: |
+          echo "::group::Debug Information"
+          echo "Action outcome: ${{ steps.claude_test.outcome }}"
+          
+          # Check if Claude Code CLI is available
+          if command -v claude >/dev/null 2>&1; then
+            echo "✅ Claude CLI is available"
+            claude --version || echo "Claude version check failed"
+          else
+            echo "❌ Claude CLI not available in action environment"
+          fi
+          
+          # Check environment
+          echo ""
+          echo "Environment variables:"
+          env | grep -E "(CLAUDE|ANTHROPIC)" || echo "No Claude/Anthropic env vars found"
+          
+          echo ""
+          echo "Working directory permissions:"
+          ls -la python/
+          
+          echo ""
+          echo "Git configuration:"
+          git config --list | grep -E "(user|credential)" || echo "Basic git config only"
+          echo "::endgroup::"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          echo "Cleaning up test branch..."
+          git checkout main || git checkout master || echo "Could not return to main branch"
+          git branch -D "$TEST_BRANCH" 2>/dev/null || echo "Could not delete test branch"
