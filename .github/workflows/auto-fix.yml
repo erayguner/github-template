@@ -289,34 +289,41 @@ jobs:
             - Dependency/import problems
             
             ### 3. **IMPLEMENTATION RULES**
+            ✅ **DO**: Use automated tools FIRST: `ruff check . --fix` and `black .`
             ✅ **DO**: Fix syntax errors, remove bad imports, correct function definitions
             ✅ **DO**: Add missing type annotations to all functions and parameters  
             ✅ **DO**: Fix import statements (remove unused, update deprecated typing)
-            ✅ **DO**: Add missing newlines at end of files
-            ✅ **DO**: Remove whitespace from blank lines
+            ✅ **DO**: Add missing newlines at end of files (W292)
+            ✅ **DO**: Remove whitespace from blank lines (W293)  
             ✅ **DO**: Use double quotes consistently (Q000)
             ✅ **DO**: Break long lines under 88 characters (E501)
-            ✅ **DO**: Simplify nested if statements (SIM102, SIM201)
+            ✅ **DO**: Simplify logic: `!= "true"` instead of `not == "true"` (SIM201)
+            ✅ **DO**: Replace `List` with `list` in type annotations (UP006)
+            ✅ **DO**: Remove redundant exception args from logging.exception() (TRY401)
             ✅ **DO**: Make sure ALL Python files compile without errors
-            ✅ **DO**: Run linting checks: `ruff check . --fix`
             ❌ **DON'T**: Modify .github/workflows/ files
             ❌ **DON'T**: Change core business logic unnecessarily
             
-            ### 4. **VERIFICATION STEPS**
-            After making changes, MUST verify:
+            ### 4. **STEP-BY-STEP FIXING PROCESS**
+            You MUST follow this exact sequence:
             ```bash
-            # Check Python syntax
-            python3 -m py_compile python/*.py src/*.py
-            
-            # Run linting and auto-fix what you can
-            ruff check . --fix
+            # Step 1: Run automated formatters and fixers FIRST
+            ruff check . --fix --unsafe-fixes
+            black . --line-length 88
             ruff format .
             
-            # Run tests if they exist
-            cd python && python -m pytest . || python -m unittest discover || true
+            # Step 2: Check Python syntax
+            python3 -m py_compile python/*.py src/*.py
             
-            # Final verification that files are clean
+            # Step 3: Manual fixes for remaining issues
+            # - Add type annotations where missing
+            # - Fix specific logic issues (SIM201, TRY401)
+            # - Update imports (UP006: List -> list)
+            # - Fix docstrings (D401)
+            
+            # Step 4: Final verification
             ruff check . --no-fix
+            python3 -m py_compile python/*.py src/*.py
             ```
             
             ## 🚀 START FIXING NOW!
@@ -328,18 +335,28 @@ jobs:
             - `src/main.py` - Fix imports, type annotations, formatting, logic
             - `src/__init__.py` - Add missing newline
             
-            **Specific error codes to address:**
-            - **ANN001/ANN201/ANN204**: Add type annotations to ALL functions and parameters
-            - **F401**: Remove unused imports like `typing.Any`  
-            - **UP035/UP006**: Replace `List` with `list`, remove `typing.List`
-            - **W292/W293**: Add newlines, remove whitespace from blank lines
-            - **Q000**: Use double quotes consistently
-            - **E501**: Break lines over 88 characters
-            - **SIM102/SIM201**: Simplify nested conditions
-            - **D401**: Fix docstring imperative mood
-            - **TRY401**: Remove redundant exception args in logging
+            **Specific error codes to address (USE AUTOMATED TOOLS FIRST):**
             
-            **Success criteria:** ALL ruff/linting errors resolved, files pass `ruff check .`
+            **AUTOMATED FIXES (ruff + black handle these):**
+            - **W292**: No newline at end of file → `ruff check . --fix`
+            - **W293**: Blank line contains whitespace → `ruff check . --fix`
+            - **Q000**: Single quotes → Use double quotes → `ruff check . --fix`
+            - **E501**: Line too long → `black . --line-length 88`
+            - **F401**: Remove unused imports → `ruff check . --fix`
+            
+            **MANUAL FIXES (after automated tools):**
+            - **ANN001/ANN201/ANN204**: Add type annotations to ALL functions and parameters
+            - **UP006**: Replace `List` with `list` in type annotations
+            - **SIM201**: Change `not x == "true"` to `x != "true"`
+            - **TRY401**: Remove redundant exception object from `logging.exception("msg", e)` → `logging.exception("msg")`  
+            - **D401**: Fix docstring imperative mood
+            - **SIM102**: Combine nested if statements
+            
+            **SUCCESS CRITERIA:** 
+            1. Run `ruff check . --fix --unsafe-fixes` first
+            2. Run `black . --line-length 88` second  
+            3. Manual fixes for remaining issues
+            4. Final check: `ruff check . --no-fix` shows ZERO errors
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           acknowledge-dangerously-skip-permissions-responsibility: "true"
           claude_args: "--max-turns 15 --model claude-sonnet-4-20250514 --dangerously-skip-permissions"
