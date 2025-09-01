@@ -15,7 +15,7 @@ def divide(a: float, b: float) -> float:
     return a / b
 
 
-result = divide(10, 0)  # Invalid syntax - should trigger auto-fix
+# result = divide(10, 0)  # Commented out to avoid ZeroDivisionError
 
 
 # --- Logic Error (test will fail) ---
@@ -24,8 +24,9 @@ def multiply(a: float, b: float) -> float:
 
 
 # --- Fake test function ---
-def test_multiply() -> None:  # Missing colon - should trigger auto-fix
+def test_multiply() -> None:
     assert multiply(3, 4) == 12  # Will fail
 
 
 # Test comment to trigger enhanced auto-fix workflow
+

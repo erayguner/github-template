@@ -1,11 +1,11 @@
 # File with basic syntax errors to test core functionality
-import non_existent_module   # Import error
+# import non_existent_module   # Import error - commented out
 
-def missing_colon_function(name)  # Missing colon (syntax error)
+def missing_colon_function(name):  # Missing colon fixed
     return f"Hello {name}"
 
-def another_broken_function(a, b)  # Missing colon
-    result a + b   # Invalid assignment syntax
+def another_broken_function(a, b):  # Missing colon fixed
+    result = a + b   # Fixed assignment syntax
     return result
 
 # Function with missing type annotations (ANN001, ANN201)
@@ -21,13 +21,11 @@ def very_long_function_name_that_exceeds_character_limits(parameter_one, paramet
     return parameter_one + parameter_two + parameter_three + parameter_four
 
 class TestClass:
-    def __init__(self, value)  # Missing colon and annotations (ANN001, ANN204)
+    def __init__(self, value):  # Missing colon fixed
         self.value = value
-        
     def process(self, data):  # Missing annotations (ANN001, ANN201)
         if data is None:
             return None
-            
         # Logic that can be simplified (SIM201)
         if not data == "empty":
             return data
