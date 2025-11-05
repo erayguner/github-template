@@ -25,11 +25,13 @@ jobs:
     name: Simulate CI Failure
     runs-on: ubuntu-latest
     if: github.event.inputs.test_scenario == 'ci_failure'
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Introduce test issues
         run: |
           # Create a file with syntax errors to trigger auto-fix
@@ -89,11 +91,13 @@ jobs:
   validate-improvements:
     name: Validate Workflow Improvements
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Validate workflow improvements
         run: |
           echo "## 📋 Workflow Improvements Validation" >> $GITHUB_STEP_SUMMARY
