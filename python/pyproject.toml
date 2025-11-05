@@ -142,7 +142,7 @@ include = ["*.py", "*.pyi", "**/pyproject.toml"]
 exclude = [
     ".eggs",
     ".git",
-    ".mypy_cache", 
+    ".mypy_cache",
     ".tox",
     ".venv",
     "_build",
@@ -150,6 +150,7 @@ exclude = [
     "build",
     "dist",
     "migrations",
+    "broken_python.py",  # Intentionally broken file for testing auto-fix
 ]
 
 # Linting configuration
