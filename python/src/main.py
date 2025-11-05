@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         logging.info("Application interrupted by user")
         return 1
-    except Exception as e:  # noqa: BLE001
+    except Exception as e:
         if argv and "--verbose" in argv:
             logging.exception("Application error")
         else:
