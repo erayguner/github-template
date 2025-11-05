@@ -1,5 +1,52 @@
 # CODEOWNERS file defines individuals or teams responsible for code in this repository
 # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+#
+# Lines starting with '#' are comments.
+# Each line is a file pattern followed by one or more owners.
+# Order is important; the last matching pattern takes precedence.
 
+# ============================================================================
 # Global owners (fallback for all files)
+# ============================================================================
 * @erayguner
+
+# ============================================================================
+# Documentation
+# ============================================================================
+*.md @erayguner
+/docs/ @erayguner
+
+# ============================================================================
+# Python code
+# ============================================================================
+/python/ @erayguner
+*.py @erayguner
+pyproject.toml @erayguner
+requirements*.txt @erayguner
+
+# ============================================================================
+# Terraform/Infrastructure
+# ============================================================================
+/terraform/ @erayguner
+*.tf @erayguner
+*.tfvars @erayguner
+
+# ============================================================================
+# CI/CD and GitHub configuration
+# ============================================================================
+/.github/ @erayguner
+/.github/workflows/ @erayguner
+.pre-commit-config.yaml @erayguner
+
+# ============================================================================
+# Security-sensitive files
+# ============================================================================
+SECURITY.md @erayguner
+.secrets.baseline @erayguner
+/terraform/providers.tf @erayguner
+
+# ============================================================================
+# Configuration files
+# ============================================================================
+.gitignore @erayguner
+LICENSE @erayguner
