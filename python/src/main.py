@@ -16,17 +16,14 @@ def setup_logging(level: int = logging.INFO) -> None:
 class Settings:
     """Application settings."""
 
-    def __init__(
-        self, config_path: str | None = None, dry_run: bool = False
-    ) -> None:
+    def __init__(self, config_path: str | None = None, dry_run: bool = False) -> None:
         """Initialize settings."""
         self.config_path = config_path
         self.dry_run = dry_run
 
         # Check for required SECRET_KEY unless in DEBUG mode
-        if (
-            os.environ.get("DEBUG", "").lower() != "true"
-            and not os.environ.get("SECRET_KEY")
+        if os.environ.get("DEBUG", "").lower() != "true" and not os.environ.get(
+            "SECRET_KEY"
         ):
             raise ValueError("SECRET_KEY environment variable is required")
 
@@ -41,9 +38,7 @@ def parse_arguments(args: list[str] | None = None) -> argparse.Namespace:
         help="Enable verbose logging",
     )
     parser.add_argument("--config", type=str, help="Configuration file path")
-    parser.add_argument(
-        "--dry-run", action="store_true", help="Run in dry-run mode"
-    )
+    parser.add_argument("--dry-run", action="store_true", help="Run in dry-run mode")
 
     return parser.parse_args(args)
 

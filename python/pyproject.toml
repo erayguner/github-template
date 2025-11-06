@@ -192,6 +192,7 @@ select = [
 
 ignore = [
     "D100", "D101", "D102", "D103", "D104", "D105", "D106", "D107",  # Missing docstrings
+    "D203",  # One blank line before class (conflicts with D211)
     "D204", "D212", "D213",  # Docstring formatting
     "PLR0913", "PLR0912", "PLR0915",  # Too many args/branches/statements
     "PLR2004",  # Magic value comparison
