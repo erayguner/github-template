@@ -1,4 +1,20 @@
-# Scripts Directory
+<div align="center">
+
+# 🛠️ Scripts Directory
+
+<p align="center">
+  <strong>Utility scripts for automation and testing</strong>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-Scripts-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python Scripts"/>
+  <img src="https://img.shields.io/badge/Bash-Automation-4EAA25?style=for-the-badge&logo=gnu-bash&logoColor=white" alt="Bash"/>
+  <img src="https://img.shields.io/badge/Utilities-Tooling-orange?style=for-the-badge&logo=tools&logoColor=white" alt="Utilities"/>
+</p>
+
+</div>
+
+---
 
 This directory contains utility scripts for the project.
 
