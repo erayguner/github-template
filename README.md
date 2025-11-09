@@ -41,9 +41,96 @@ Production-ready GitHub template for Terraform and Python projects with automate
 
 ## 🚀 Quick Start
 
-1. **Create from template**: Use this repository as a GitHub template
-2. **Setup**: `cd python && uv sync --group dev && pre-commit install`
-3. **Configure**: Edit `terraform/terraform.tfvars` for cloud resources
+### Prerequisites
+
+Before you begin, ensure you have the following installed:
+- **Python 3.9+** - [Download here](https://www.python.org/downloads/)
+- **UV** - Ultra-fast Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+- **Terraform 1.6+** - [Download here](https://www.terraform.io/downloads)
+- **Git** - [Download here](https://git-scm.com/downloads)
+
+### Setup Steps
+
+#### 1. Create from Template
+Use this repository as a GitHub template or clone it:
+```bash
+git clone https://github.com/YOUR_USERNAME/github-template.git
+cd github-template
+```
+
+#### 2. Python Setup
+```bash
+# Navigate to Python directory
+cd python
+
+# Create virtual environment and install dependencies
+uv sync --group dev
+
+# Activate the virtual environment (optional but recommended)
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Run tests to verify setup
+uv run pytest
+
+# Run linting
+uv run ruff check .
+```
+
+#### 3. Terraform Setup
+```bash
+# Navigate to Terraform directory
+cd terraform
+
+# Copy and configure variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+
+# Initialize Terraform
+terraform init
+
+# Validate configuration
+terraform validate
+
+# Plan your infrastructure (review before applying)
+terraform plan
+
+# Apply infrastructure (when ready)
+terraform apply
+```
+
+#### 4. Git Hooks Setup
+```bash
+# Return to project root
+cd ..
+
+# Install pre-commit hooks
+pre-commit install
+
+# Test pre-commit hooks (optional)
+pre-commit run --all-files
+```
+
+### Verify Installation
+
+Run these commands to verify everything is working:
+
+```bash
+# Python checks
+cd python && uv run pytest && cd ..
+
+# Terraform checks
+cd terraform && terraform validate && cd ..
+
+# Pre-commit check
+pre-commit run --all-files
+```
+
+### Next Steps
+
+- 📖 Read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
+- 🔒 Review [SECURITY.md](SECURITY.md) for security policies
+- 📚 Check [docs/](docs/) for detailed documentation
+- 🏗️ See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions
 
 ## License
 
