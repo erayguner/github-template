@@ -33,6 +33,74 @@ This directory contains a modern Python project setup with **UV** package manage
 - **Modern Standards**: Uses pyproject.toml and dependency groups
 - **Enterprise Ready**: Security scanning, type checking, comprehensive testing
 
+## 🔄 **Linting & Quality Pipeline**
+
+Our code quality workflow integrates multiple tools that work together seamlessly:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Code Quality Pipeline                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    Your Code (*.py)
+         │
+         ├──────────────┬──────────────┬──────────────┬──────────────┐
+         ▼              ▼              ▼              ▼              ▼
+    ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │  Ruff   │   │  mypy   │   │ Bandit  │   │ pytest  │   │ Safety  │
+    │ Linter  │   │  Type   │   │Security │   │  Tests  │   │  Deps   │
+    └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
+         │              │              │              │              │
+         ├──────────────┼──────────────┼──────────────┼──────────────┤
+         ▼              ▼              ▼              ▼              ▼
+
+    • Style         • Types       • Vulns       • Coverage    • CVEs
+    • Format        • Annotations • Hardcoded   • Unit Tests  • Outdated
+    • Imports       • Contracts   • Injection   • Integration • Licenses
+    • Complexity    • Generics    • Crypto      • Mocking     • Conflicts
+
+         │              │              │              │              │
+         └──────────────┴──────────────┴──────────────┴──────────────┘
+                                     │
+                                     ▼
+                          ┌──────────────────┐
+                          │  Pre-commit Hook │
+                          │  (GitLeaks etc.) │
+                          └──────────────────┘
+                                     │
+                                     ▼
+                          ┌──────────────────┐
+                          │   CI/CD Pipeline │
+                          │   (GitHub Actions)│
+                          └──────────────────┘
+                                     │
+                                     ▼
+                              ✅ Production Ready
+```
+
+### **Tool Responsibilities**
+
+| Tool | Purpose | What It Checks | Speed |
+|------|---------|----------------|-------|
+| **Ruff** | Linting & Formatting | Style, imports, complexity, best practices | ⚡ 150-1000x faster |
+| **mypy** | Type Checking | Type hints, type safety, contracts | 🔍 Static analysis |
+| **Bandit** | Security Scanning | SQL injection, hardcoded secrets, crypto | 🛡️ Security focused |
+| **pytest** | Testing | Unit tests, integration, coverage | 🧪 Runtime validation |
+| **Safety** | Dependency Security | Known vulnerabilities in packages | 📦 CVE database |
+| **Pre-commit** | Git Hooks | Secrets, large files, syntax | 🚫 Prevention |
+
+### **Replaced Legacy Tools**
+
+Ruff alone replaces these 8+ tools:
+- ❌ **Black** → ✅ Ruff Format
+- ❌ **Flake8** → ✅ Ruff Check
+- ❌ **isort** → ✅ Ruff Check (I rules)
+- ❌ **pyupgrade** → ✅ Ruff Check (UP rules)
+- ❌ **pydocstyle** → ✅ Ruff Check (D rules)
+- ❌ **pylint** → ✅ Ruff Check (PL rules)
+- ❌ **autoflake** → ✅ Ruff Check (F rules)
+- ❌ **pycodestyle** → ✅ Ruff Check (E/W rules)
+
 ## 🛠️ **Quick Start**
 
 ### 1. **Install UV**
