@@ -1,6 +1,6 @@
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py311"
 
 exclude = [
     "python/broken_python.py",  # Intentionally broken file for testing auto-fix

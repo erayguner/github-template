@@ -33,7 +33,7 @@ This production-ready GitHub repository template includes:
 - ✅ **Security Scanning** - tfsec and Checkov integration
 - ✅ **Documentation** - Auto-generated with terraform-docs
 - ✅ **Validation** - Multiple cloud provider validation
-- ✅ **Best Practices** - Modern Terraform 1.6+ patterns
+- ✅ **Best Practices** - Modern Terraform 1.10+ patterns
 
 #### **Development Tools**
 - ✅ **Pre-commit Hooks** - 15+ hooks including GitLeaks secret detection

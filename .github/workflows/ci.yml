@@ -30,13 +30,13 @@ jobs:
 
       - name: Set up Python
         if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
-        run: uv python install 3.11
+        run: uv python install 3.13
 
       - name: Setup Terraform
         if: hashFiles('**/*.tf') != ''
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: ~1.6.0
+          terraform_version: ~1.10.0
 
       - name: Install linting tools (shellcheck, yamllint)
         run: |
@@ -49,7 +49,7 @@ jobs:
         working-directory: ./python
         run: |
           # Setup environment
-          uv venv --python 3.11
+          uv venv --python 3.13
           if [[ -f "pyproject.toml" ]]; then
             uv sync --group dev || true
           elif [[ -f "requirements.txt" ]]; then

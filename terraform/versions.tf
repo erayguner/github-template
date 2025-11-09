@@ -1,7 +1,7 @@
 # Terraform and provider version constraints
 
 terraform {
-  required_version = ">= 1.6.0"
+  required_version = ">= 1.10.0"
 
   required_providers {
     # AWS Provider (optional - enabled via var.enable_aws)

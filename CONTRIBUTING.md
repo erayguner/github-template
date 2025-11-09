@@ -14,8 +14,8 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 ### Prerequisites
 
-- Python 3.9+ with UV package manager
-- Terraform 1.6+
+- Python 3.11+ with UV package manager
+- Terraform 1.10+
 - Git
 - Pre-commit hooks
 
