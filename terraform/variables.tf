@@ -52,8 +52,8 @@ variable "aws_region" {
   default     = "us-west-2"
 
   validation {
-    condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.aws_region))
-    error_message = "AWS region must be in the format: us-west-2, eu-central-1, etc."
+    condition     = can(regex("^[a-z]{2}-[a-z-]+-[0-9]$", var.aws_region))
+    error_message = "AWS region must match pattern like us-west-2, eu-central-1"
   }
 }
 
@@ -122,12 +122,6 @@ variable "instance_type" {
   }
 }
 
-variable "enable_monitoring" {
-  description = "Enable CloudWatch monitoring"
-  type        = bool
-  default     = true
-}
-
 variable "backup_retention_days" {
   description = "Number of days to retain backups"
   type        = number
@@ -137,4 +131,51 @@ variable "backup_retention_days" {
     condition     = var.backup_retention_days >= 1 && var.backup_retention_days <= 365
     error_message = "Backup retention days must be between 1 and 365."
   }
+}
+
+# Network / Security Configuration Additions
+variable "allowed_http_cidrs" {
+  description = "CIDR blocks allowed for HTTP (80) ingress (default open)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = alltrue([for c in var.allowed_http_cidrs : can(cidrhost(c, 0))])
+    error_message = "Each entry in allowed_http_cidrs must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "allowed_https_cidrs" {
+  description = "CIDR blocks allowed for HTTPS (443) ingress (default open)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = alltrue([for c in var.allowed_https_cidrs : can(cidrhost(c, 0))])
+    error_message = "Each entry in allowed_https_cidrs must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "allowed_ssh_cidrs" {
+  description = "CIDR blocks allowed for SSH (22) ingress (default open)"
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+  validation {
+    condition     = alltrue([for c in var.allowed_ssh_cidrs : can(cidrhost(c, 0))])
+    error_message = "Each entry in allowed_ssh_cidrs must be a valid IPv4 CIDR block."
+  }
+}
+
+variable "log_retention_days" {
+  description = "Retention period (days) for log groups / flow logs"
+  type        = number
+  default     = 7
+  validation {
+    condition     = var.log_retention_days >= 1 && var.log_retention_days <= 365
+    error_message = "log_retention_days must be between 1 and 365."
+  }
+}
+
+variable "enable_flow_logs" {
+  description = "Enable creation of flow logs resources (AWS & enhanced GCP subnet logging)"
+  type        = bool
+  default     = true
 }

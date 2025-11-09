@@ -60,16 +60,9 @@ locals {
     gcp = var.enable_gcp
   }
 
-  # Common tags/labels for resources
   common_tags = {
     Environment = var.environment
     Project     = var.project_name
     ManagedBy   = "Terraform"
-  }
-
-  common_labels = {
-    environment = var.environment
-    project     = var.project_name
-    managed-by  = "terraform"
   }
 }
