@@ -2,9 +2,13 @@
 line-length = 88
 target-version = "py39"
 
+exclude = [
+    "python/broken_python.py",  # Intentionally broken file for testing auto-fix
+]
+
 select = [
     "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings  
+    "W",  # pycodestyle warnings
     "F",  # pyflakes
     "I",  # isort
     "S",  # bandit security
@@ -19,5 +23,5 @@ ignore = [
 "tests/**/*" = ["S101"]
 
 [tool.bandit]
-exclude_dirs = ["tests"]
+exclude_dirs = ["tests", "python/broken_python.py"]
 skips = ["B101"]
