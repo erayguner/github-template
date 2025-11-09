@@ -53,7 +53,7 @@ jobs:
           else
             echo "❌ ANTHROPIC_API_KEY is not set"
           fi
-          
+
           if [ -n "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}" ]; then
             echo "✅ CLAUDE_CODE_OAUTH_TOKEN is set"
           else
@@ -68,7 +68,7 @@ jobs:
           echo "::group::Pre-test Analysis"
           echo "Current git status:"
           git status
-          
+
           echo ""
           echo "Python syntax check before Claude:"
           python3 -c "
@@ -91,12 +91,12 @@ jobs:
         with:
           prompt: |
             I need you to fix Python syntax errors in this repository.
-            
+
             Please check the file `python/broken_python.py` and fix these specific issues:
             1. Missing colon after function definitions
-            2. Invalid assignment syntax 
+            2. Invalid assignment syntax
             3. Import statement for non-existent module
-            
+
             Make the minimal changes needed to make the Python file syntactically correct.
             Start by reading the file and identifying the exact errors.
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -108,22 +108,22 @@ jobs:
           echo "::group::Post-test Analysis"
           echo "Claude outcome: ${{ steps.claude_test.outcome }}"
           echo "Claude conclusion: ${{ steps.claude_test.conclusion }}"
-          
+
           echo ""
           echo "Current git status after Claude:"
           git status --porcelain
-          
+
           echo ""
           echo "File changes:"
           git diff --name-only HEAD 2>/dev/null || echo "No changes detected"
-          
+
           if git diff --quiet HEAD 2>/dev/null; then
             echo "❌ NO FILES WERE MODIFIED BY CLAUDE"
           else
             echo "✅ Files were modified by Claude"
             git diff HEAD
           fi
-          
+
           echo ""
           echo "Python syntax check after Claude:"
           python3 -c "
@@ -145,10 +145,10 @@ jobs:
         run: |
           echo "::group::Testing Direct File Modification"
           echo "Claude failed - testing if we can modify files manually..."
-          
+
           # Make a simple test modification
           echo "# Test modification - $(date)" >> python/broken_python.py
-          
+
           if git diff --quiet; then
             echo "❌ Cannot modify files - permission issue"
           else
@@ -162,7 +162,7 @@ jobs:
         run: |
           echo "::group::Debug Information"
           echo "Action outcome: ${{ steps.claude_test.outcome }}"
-          
+
           # Check if Claude Code CLI is available
           if command -v claude >/dev/null 2>&1; then
             echo "✅ Claude CLI is available"
@@ -170,16 +170,16 @@ jobs:
           else
             echo "❌ Claude CLI not available in action environment"
           fi
-          
+
           # Check environment
           echo ""
           echo "Environment variables:"
           env | grep -E "(CLAUDE|ANTHROPIC)" || echo "No Claude/Anthropic env vars found"
-          
+
           echo ""
           echo "Working directory permissions:"
           ls -la python/
-          
+
           echo ""
           echo "Git configuration:"
           git config --list | grep -E "(user|credential)" || echo "Basic git config only"

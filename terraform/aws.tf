@@ -18,45 +18,42 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
-    Name = "${var.project_name}-vpc"
-  }
+  tags = merge(local.common_tags, var.tags, {
+    Name  = "${var.project_name}-${var.environment}-aws-vpc"
+    Cloud = "aws"
+  })
 }
 
 # AWS VPC Flow Logs for security monitoring
 resource "aws_flow_log" "vpc_flow_logs" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
   iam_role_arn    = aws_iam_role.flow_log[0].arn
   log_destination = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
   traffic_type    = "ALL"
   vpc_id          = aws_vpc.main[0].id
 
-  tags = {
-    Name = "${var.project_name}-vpc-flow-logs"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-vpc-flow-logs" })
 }
 
 # CloudWatch Log Group for VPC Flow Logs
 resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
-  name              = "/aws/vpc/${var.project_name}-flow-logs"
-  retention_in_days = 7                       # Keep costs low for template
-  kms_key_id        = aws_kms_key.logs[0].arn # Encrypt logs
+  name              = "/aws/vpc/${var.project_name}-${var.environment}-flow-logs"
+  retention_in_days = var.log_retention_days
+  kms_key_id        = aws_kms_key.logs[0].arn
 
-  tags = {
-    Name = "${var.project_name}-vpc-flow-logs"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-vpc-flow-logs" })
 
   depends_on = [aws_kms_key.logs]
 }
 
 # IAM Role for VPC Flow Logs
 resource "aws_iam_role" "flow_log" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
-  name_prefix = "${var.project_name}-flow-log-"
+  name_prefix = "${var.project_name}-${var.environment}-flow-log-"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -64,35 +61,27 @@ resource "aws_iam_role" "flow_log" {
       {
         Action = "sts:AssumeRole"
         Effect = "Allow"
-        Principal = {
-          Service = "vpc-flow-logs.amazonaws.com"
-        }
+        Principal = { Service = "vpc-flow-logs.amazonaws.com" }
       }
     ]
   })
 
-  tags = {
-    Name = "${var.project_name}-flow-log-role"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-flow-log-role" })
 }
 
 # IAM Policy for VPC Flow Logs
 resource "aws_iam_role_policy" "flow_log" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
-  name_prefix = "${var.project_name}-flow-log-"
+  name_prefix = "${var.project_name}-${var.environment}-flow-log-"
   role        = aws_iam_role.flow_log[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
       {
-        Action = [
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Effect   = "Allow"
+        Action = ["logs:CreateLogStream", "logs:PutLogEvents", "logs:DescribeLogStreams"]
+        Effect = "Allow"
         Resource = aws_cloudwatch_log_group.vpc_flow_logs[0].arn
       }
     ]
@@ -106,12 +95,12 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.main[0].id
   cidr_block              = cidrsubnet(var.vpc_cidr, 8, count.index)
   availability_zone       = data.aws_availability_zones.available[0].names[count.index]
-  map_public_ip_on_launch = false # Security: Don't auto-assign public IPs
+  map_public_ip_on_launch = false
 
-  tags = {
-    Name = "${var.project_name}-public-${count.index + 1}"
+  tags = merge(local.common_tags, var.tags, {
+    Name = "${var.project_name}-${var.environment}-aws-public-${count.index + 1}"
     Type = "Public"
-  }
+  })
 }
 
 # AWS Internet Gateway
@@ -120,9 +109,7 @@ resource "aws_internet_gateway" "main" {
 
   vpc_id = aws_vpc.main[0].id
 
-  tags = {
-    Name = "${var.project_name}-igw"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-igw" })
 }
 
 # AWS Route Table
@@ -136,9 +123,7 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main[0].id
   }
 
-  tags = {
-    Name = "${var.project_name}-public-rt"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-public-rt" })
 }
 
 # AWS Route Table Associations
@@ -153,79 +138,71 @@ resource "aws_route_table_association" "public" {
 resource "aws_security_group" "web" {
   count = var.enable_aws ? 1 : 0
 
-  name_prefix = "${var.project_name}-web-"
+  name_prefix = "${var.project_name}-${var.environment}-aws-web-"
   vpc_id      = aws_vpc.main[0].id
-  description = "Security group for web servers with restricted access"
+  description = "Security group for web servers with configurable ingress"
 
-  # Allow HTTP only from trusted networks (replace with your actual CIDR)
-  ingress {
-    description = "HTTP from trusted networks"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
+  # HTTP ingress
+  dynamic "ingress" {
+    for_each = var.allowed_http_cidrs
+    content {
+      description = "HTTP ingress"
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
   }
 
-  # Allow HTTPS only from trusted networks
-  ingress {
-    description = "HTTPS from trusted networks"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
+  # HTTPS ingress
+  dynamic "ingress" {
+    for_each = var.allowed_https_cidrs
+    content {
+      description = "HTTPS ingress"
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
   }
 
-  # Restrict egress to VPC only - add specific rules as needed
-  # NOTE: For production, add specific egress rules for required services
-  # Example: HTTPS to specific domains, database access, etc.
+  # SSH ingress (optional use case)
+  dynamic "ingress" {
+    for_each = var.allowed_ssh_cidrs
+    content {
+      description = "SSH ingress"
+      from_port   = 22
+      to_port     = 22
+      protocol    = "tcp"
+      cidr_blocks = [ingress.value]
+    }
+  }
+
   egress {
-    description = "Allow outbound within VPC"
+    description = "Allow all outbound"
     from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
-    Name = "${var.project_name}-web-sg"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-web-sg" })
 }
 
 # KMS Key for CloudWatch Logs encryption
 resource "aws_kms_key" "logs" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
   description             = "KMS key for CloudWatch Logs encryption"
-  deletion_window_in_days = 7    # Shorter window for template
-  enable_key_rotation     = true # Enable automatic key rotation
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
 
-  tags = {
-    Name = "${var.project_name}-logs-key"
-  }
+  tags = merge(local.common_tags, var.tags, { Name = "${var.project_name}-${var.environment}-aws-logs-key" })
 }
 
 resource "aws_kms_alias" "logs" {
-  count = var.enable_aws ? 1 : 0
+  count = var.enable_aws && var.enable_flow_logs ? 1 : 0
 
-  name          = "alias/${var.project_name}-logs"
+  name          = "alias/${var.project_name}-${var.environment}-aws-logs"
   target_key_id = aws_kms_key.logs[0].key_id
 }
-
-# Add a NAT Gateway for secure outbound access (optional, costs money)
-# Uncomment if you need secure outbound internet access
-# resource "aws_eip" "nat" {
-#   count = var.enable_aws ? 1 : 0
-#   domain = "vpc"
-#   tags = {
-#     Name = "${var.project_name}-nat-eip"
-#   }
-# }
-#
-# resource "aws_nat_gateway" "main" {
-#   count = var.enable_aws ? 1 : 0
-#   allocation_id = aws_eip.nat[0].id
-#   subnet_id     = aws_subnet.public[0].id
-#   tags = {
-#     Name = "${var.project_name}-nat-gw"
-#   }
-# }

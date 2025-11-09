@@ -48,7 +48,7 @@ jobs:
           echo "repository=${{ github.repository }}"
           echo "run_id=${{ github.run_id }}"
           echo "run_number=${{ github.run_number }}"
-          
+
           if [ "${{ github.event_name }}" = "workflow_run" ]; then
             echo "workflow_run.name=${{ github.event.workflow_run.name }}"
             echo "workflow_run.conclusion=${{ github.event.workflow_run.conclusion }}"
@@ -80,12 +80,12 @@ jobs:
               if (context.eventName === 'workflow_dispatch') {
                 const prBranch = '${{ inputs.pr_branch }}';
                 const baseBranch = '${{ inputs.base_branch }}' || 'main';
-                
+
                 if (!prBranch) {
                   core.setFailed('For manual run, pr_branch input is required.');
                   return;
                 }
-                
+
                 core.setOutput('head_ref', prBranch);
                 core.setOutput('base_ref', baseBranch);
                 core.setOutput('number', '');
@@ -98,7 +98,7 @@ jobs:
               // workflow_run path
               const run = context.payload.workflow_run;
               const prLite = run.pull_requests && run.pull_requests[0];
-              
+
               if (!prLite) {
                 core.setFailed('No PR associated with this workflow run. This might be a push to main branch.');
                 return;
@@ -106,21 +106,21 @@ jobs:
 
               // Fetch full PR details
               const { data: pr } = await github.rest.pulls.get({
-                owner: context.repo.owner, 
-                repo: context.repo.repo, 
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 pull_number: prLite.number
               });
-              
+
               const sameRepo = pr.head.repo.full_name === `${context.repo.owner}/${context.repo.repo}`;
-              
+
               core.setOutput('head_ref', pr.head.ref);
               core.setOutput('base_ref', pr.base.ref);
               core.setOutput('number', pr.number.toString());
               core.setOutput('same_repo', sameRepo ? 'true' : 'false');
               core.setOutput('pr_url', pr.html_url);
-              
+
               core.info(`PR #${pr.number}: ${pr.head.ref} -> ${pr.base.ref} (same_repo: ${sameRepo})`);
-              
+
             } catch (error) {
               core.setFailed(`Failed to determine PR details: ${error.message}`);
             }
@@ -144,14 +144,14 @@ jobs:
         continue-on-error: true
         run: |
           echo "::group::Cleaning up old fix branches"
-          
+
           # Get all claude-auto-fix branches, sorted by creation date (oldest first)
           OLD_BRANCHES=$(git branch -r --sort=creatordate | grep "origin/claude-auto-fix-ci-" | head -n -${{ env.CLEANUP_THRESHOLD }} || true)
-          
+
           if [ -n "$OLD_BRANCHES" ]; then
             echo "Found old branches to cleanup:"
             echo "$OLD_BRANCHES"
-            
+
             echo "$OLD_BRANCHES" | while read -r branch; do
               # Remove origin/ prefix and delete branch
               BRANCH_NAME=${branch#origin/}
@@ -161,7 +161,7 @@ jobs:
           else
             echo "No old branches to cleanup"
           fi
-          
+
           echo "::endgroup::"
 
       - name: Decide fix branch strategy
@@ -175,10 +175,10 @@ jobs:
             # Create unique branch name with timestamp to avoid collisions
             TIMESTAMP=$(date +%s)
             FIX_BRANCH="claude-auto-fix-ci-${{ steps.pick.outputs.head_ref }}-${{ github.run_id }}-${TIMESTAMP}"
-            
+
             echo "Creating fix branch: $FIX_BRANCH"
             git checkout -b "$FIX_BRANCH"
-            
+
             echo "branch=$FIX_BRANCH" >> $GITHUB_OUTPUT
             echo "mode=branch" >> $GITHUB_OUTPUT
             echo "🔧 Created fix branch: $FIX_BRANCH"
@@ -192,14 +192,14 @@ jobs:
           script: |
             try {
               const run_id = context.payload.workflow_run.id;
-              
+
               // Get all jobs for the failed workflow run
               const { data } = await github.rest.actions.listJobsForWorkflowRun({
-                owner: context.repo.owner, 
-                repo: context.repo.repo, 
+                owner: context.repo.owner,
+                repo: context.repo.repo,
                 run_id
               });
-              
+
               const failed = data.jobs.filter(j => j.conclusion === 'failure');
               const failedNames = failed.map(j => j.name);
               const failedDetails = failed.map(j => ({
@@ -209,12 +209,12 @@ jobs:
                   conclusion: s.conclusion
                 })) || []
               }));
-              
+
               core.setOutput('failed', JSON.stringify(failedNames));
               core.setOutput('failed_details', JSON.stringify(failedDetails));
-              
+
               core.info(`Found ${failedNames.length} failed jobs: ${failedNames.join(', ')}`);
-              
+
             } catch (error) {
               core.setFailed(`Failed to collect job details: ${error.message}`);
             }
@@ -225,7 +225,7 @@ jobs:
           echo "Current working directory: $(pwd)"
           echo "Files in repository:"
           find . -name "*.py" -type f | head -10
-          
+
           echo ""
           echo "Checking Python file syntax before Claude:"
           for pyfile in python/*.py; do
@@ -234,7 +234,7 @@ jobs:
               python3 -m py_compile "$pyfile" 2>&1 || echo "❌ Syntax error in $pyfile"
             fi
           done
-          
+
           echo ""
           echo "Git status before Claude:"
           git status --porcelain
@@ -253,48 +253,48 @@ jobs:
         with:
           prompt: |
             ## 🚨 CRITICAL CI FAILURE - IMMEDIATE FIXES REQUIRED
-            
+
             **Repository:** ${{ github.repository }}
             **Branch:** ${{ steps.pick.outputs.head_ref }} → ${{ steps.pick.outputs.base_ref }}
             **Failed Jobs:** ${{ steps.details.outputs.failed || 'Manual run - analyze all files' }}
-            
+
             ## 🎯 YOUR MISSION: Fix ALL CI failures
-            
+
             A CI workflow has FAILED and needs immediate fixes. You MUST:
-            
+
             ### 1. **ANALYZE FAILURES**
-            - Read ALL Python files in the repository 
+            - Read ALL Python files in the repository
             - Check for syntax errors, import errors, and logical issues
             - Look specifically at `python/broken_python.py` and `src/` files
             - Examine any linting/test output for specific error codes
-            
+
             ### 2. **FIX THESE SPECIFIC ISSUES**
             **Python Syntax Errors** (CRITICAL):
             - Missing colons in function definitions
-            - Invalid variable assignments 
+            - Invalid variable assignments
             - Import errors for non-existent modules
             - Function call syntax errors
-            
+
             **Linting and Type Errors** (CRITICAL):
             - Missing type annotations (ANN001, ANN201, ANN204)
             - Import issues (F401 unused imports, UP035/UP006 deprecated typing)
             - Formatting issues (W292 missing newlines, W293 blank line whitespace)
             - Code style (Q000 quote style, E501 line length, D401 docstring style)
             - Logic simplification (SIM102, SIM201)
-            
+
             **Common CI Issues**:
             - Linting errors (ruff, flake8, black, isort)
             - Test failures and assertion errors
             - Type checking issues
             - Dependency/import problems
-            
+
             ### 3. **IMPLEMENTATION RULES**
             ✅ **DO**: Use automated tools FIRST: `ruff check . --fix` and `black .`
             ✅ **DO**: Fix syntax errors, remove bad imports, correct function definitions
-            ✅ **DO**: Add missing type annotations to all functions and parameters  
+            ✅ **DO**: Add missing type annotations to all functions and parameters
             ✅ **DO**: Fix import statements (remove unused, update deprecated typing)
             ✅ **DO**: Add missing newlines at end of files (W292)
-            ✅ **DO**: Remove whitespace from blank lines (W293)  
+            ✅ **DO**: Remove whitespace from blank lines (W293)
             ✅ **DO**: Use double quotes consistently (Q000)
             ✅ **DO**: Break long lines under 88 characters (E501)
             ✅ **DO**: Simplify logic: `!= "true"` instead of `not == "true"` (SIM201)
@@ -303,7 +303,7 @@ jobs:
             ✅ **DO**: Make sure ALL Python files compile without errors
             ❌ **DON'T**: Modify .github/workflows/ files
             ❌ **DON'T**: Change core business logic unnecessarily
-            
+
             ### 4. **STEP-BY-STEP FIXING PROCESS**
             You MUST follow this exact sequence:
             ```bash
@@ -311,50 +311,50 @@ jobs:
             ruff check . --fix --unsafe-fixes
             black . --line-length 88
             ruff format .
-            
+
             # Step 2: Check Python syntax
             python3 -m py_compile python/*.py src/*.py
-            
+
             # Step 3: Manual fixes for remaining issues
             # - Add type annotations where missing
             # - Fix specific logic issues (SIM201, TRY401)
             # - Update imports (UP006: List -> list)
             # - Fix docstrings (D401)
-            
+
             # Step 4: Final verification
             ruff check . --no-fix
             python3 -m py_compile python/*.py src/*.py
             ```
-            
+
             ## 🚀 START FIXING NOW!
-            
+
             **CRITICAL**: The CI is failing with specific linting errors. You must fix ALL of these:
-            
+
             **Files to fix:**
             - `python/broken_python.py` - Add type annotations, fix formatting
             - `src/main.py` - Fix imports, type annotations, formatting, logic
             - `src/__init__.py` - Add missing newline
-            
+
             **Specific error codes to address (USE AUTOMATED TOOLS FIRST):**
-            
+
             **AUTOMATED FIXES (ruff + black handle these):**
             - **W292**: No newline at end of file → `ruff check . --fix`
             - **W293**: Blank line contains whitespace → `ruff check . --fix`
             - **Q000**: Single quotes → Use double quotes → `ruff check . --fix`
             - **E501**: Line too long → `black . --line-length 88`
             - **F401**: Remove unused imports → `ruff check . --fix`
-            
+
             **MANUAL FIXES (after automated tools):**
             - **ANN001/ANN201/ANN204**: Add type annotations to ALL functions and parameters
             - **UP006**: Replace `List` with `list` in type annotations
             - **SIM201**: Change `not x == "true"` to `x != "true"`
-            - **TRY401**: Remove redundant exception object from `logging.exception("msg", e)` → `logging.exception("msg")`  
+            - **TRY401**: Remove redundant exception object from `logging.exception("msg", e)` → `logging.exception("msg")`
             - **D401**: Fix docstring imperative mood
             - **SIM102**: Combine nested if statements
-            
-            **SUCCESS CRITERIA:** 
+
+            **SUCCESS CRITERIA:**
             1. Run `ruff check . --fix --unsafe-fixes` first
-            2. Run `black . --line-length 88` second  
+            2. Run `black . --line-length 88` second
             3. Manual fixes for remaining issues
             4. Final check: `ruff check . --no-fix` shows ZERO errors
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -365,12 +365,12 @@ jobs:
         if: steps.claude.outcome == 'success'
         run: |
           echo "::group::Verifying changes made by Claude"
-          
+
           # Check if any files were modified
           CHANGED_FILES=$(git diff --name-only HEAD || true)
           STAGED_FILES=$(git diff --staged --name-only || true)
           UNTRACKED_FILES=$(git ls-files --others --exclude-standard || true)
-          
+
           echo "Modified files:"
           echo "${CHANGED_FILES:-None}"
           echo ""
@@ -379,7 +379,7 @@ jobs:
           echo ""
           echo "Untracked files:"
           echo "${UNTRACKED_FILES:-None}"
-          
+
           # Show a summary of changes
           if [ -n "$CHANGED_FILES" ] || [ -n "$STAGED_FILES" ] || [ -n "$UNTRACKED_FILES" ]; then
             echo ""
@@ -388,10 +388,10 @@ jobs:
             echo ""
             echo "Detailed diff:"
             git diff HEAD
-            
+
             echo ""
             echo "::group::Testing fixes"
-            
+
             # Test Python syntax
             if ls python/*.py >/dev/null 2>&1; then
               echo "Testing Python syntax..."
@@ -403,7 +403,7 @@ jobs:
                 fi
               done
             fi
-            
+
             # Run basic syntax validation
             echo "Running final syntax check..."
             for pyfile in python/*.py; do
@@ -411,12 +411,12 @@ jobs:
                 python3 -c "import ast; ast.parse(open('$pyfile').read())" && echo "✅ $pyfile: Syntax valid" || echo "❌ $pyfile: Syntax error"
               fi
             done
-            
+
             echo "::endgroup::"
           else
             echo "No changes detected - Claude may not have found fixable issues"
           fi
-          
+
           echo "::endgroup::"
 
       - name: Debug Claude execution
@@ -425,20 +425,20 @@ jobs:
           echo "::group::Claude Execution Debug"
           echo "Claude outcome: ${{ steps.claude.outcome }}"
           echo "Claude conclusion: ${{ steps.claude.conclusion }}"
-          
+
           # Check Claude Code action logs/outputs
           echo ""
           echo "Current git status:"
           git status --porcelain
-          
+
           echo ""
           echo "Any new or modified files?"
           git diff --name-only HEAD 2>/dev/null || echo "No diff available"
-          
+
           echo ""
           echo "Staged files:"
           git diff --staged --name-only 2>/dev/null || echo "No staged files"
-          
+
           # Check if we have any Python files with remaining issues
           echo ""
           echo "Post-Claude Python syntax check:"
@@ -460,17 +460,17 @@ jobs:
         run: |
           echo "::warning::Claude failed to make fixes. This could be due to:"
           echo "- Complex issues requiring human intervention"
-          echo "- API rate limits or connectivity issues"  
+          echo "- API rate limits or connectivity issues"
           echo "- Repository structure that Claude couldn't understand"
           echo "- Permission issues with file modifications"
           echo ""
           echo "Manual investigation may be required."
-          
+
           # Show what Claude was supposed to fix
           echo ""
           echo "Expected fixes needed:"
           echo "- python/broken_python.py: Multiple syntax errors"
-          
+
           # Restore backup if it exists
           git stash pop || echo "No backup to restore"
 
@@ -478,28 +478,28 @@ jobs:
         if: steps.claude.outcome == 'success'
         run: |
           echo "::group::Committing changes"
-          
+
           # Stage all changes
           git add -A
-          
+
           # Check if there are changes to commit
           if git diff --staged --quiet; then
             echo "::notice::No changes to commit - Claude may have determined no fixes were needed"
             exit 0
           fi
-          
+
           # Create detailed commit message
           COMMIT_MSG="chore(ci): auto-fix CI failures
 
           Auto-generated fixes for failing CI jobs:
           ${{ steps.details.outputs.failed || 'Manual run' }}
-          
+
           Generated by: ${{ github.workflow }} #${{ github.run_number }}
           Triggered by: ${{ github.event_name }}
           Repository: ${{ github.repository }}"
-          
+
           git commit -m "$COMMIT_MSG"
-          
+
           # Configure git with PAT if available to trigger workflows
           if [ -n "${{ secrets.PAT_TOKEN }}" ]; then
             git config --global url."https://x-access-token:${{ secrets.PAT_TOKEN }}@github.com/".insteadOf "https://github.com/"
@@ -507,7 +507,7 @@ jobs:
           else
             echo "⚠️  Using GITHUB_TOKEN - new workflows may not trigger"
           fi
-          
+
           # Push with retry logic
           for i in $(seq 1 ${{ env.MAX_RETRY_ATTEMPTS }}); do
             if git push -u origin "${{ steps.branch.outputs.branch }}"; then
@@ -525,7 +525,7 @@ jobs:
               fi
             fi
           done
-          
+
           echo "::endgroup::"
 
       - name: Trigger CI re-run (if PAT available)
@@ -536,17 +536,17 @@ jobs:
           github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const hasPAT = '${{ secrets.PAT_TOKEN }}' !== '';
-            
+
             if (!hasPAT) {
               console.log('⚠️ PAT_TOKEN not configured - using GITHUB_TOKEN');
               console.log('New workflows may not trigger automatically due to GitHub security restrictions');
               return;
             }
-            
+
             // Try to re-run the original failed workflow
             const workflowId = "${{ github.event.workflow_run.workflow_id || 'ci.yml' }}";
             const ref = "${{ steps.pick.outputs.head_ref }}";
-            
+
             try {
               // Dispatch the CI workflow on the target branch
               await github.rest.actions.createWorkflowDispatch({
@@ -555,9 +555,9 @@ jobs:
                 workflow_id: workflowId,
                 ref: ref
               });
-              
+
               console.log(`✅ Triggered workflow ${workflowId} on branch ${ref}`);
-              
+
             } catch (error) {
               console.log(`⚠️ Could not trigger workflow: ${error.message}`);
               console.log('Workflows will trigger automatically on push if PAT has correct permissions');
@@ -565,34 +565,34 @@ jobs:
 
       - name: Comment on original PR (direct push)
         if: |
-          github.event_name == 'workflow_run' && 
-          steps.branch.outputs.mode == 'direct' && 
+          github.event_name == 'workflow_run' &&
+          steps.branch.outputs.mode == 'direct' &&
           steps.pick.outputs.number != '' &&
           steps.claude.outcome == 'success'
         uses: actions/github-script@v7
         with:
           script: |
             const commentBody = `🤖 **Auto-fixes applied**
-            
+
             I've automatically pushed fixes for the failing CI jobs directly to \`${{ steps.pick.outputs.head_ref }}\`.
-            
+
             **Fixed jobs:** ${{ steps.details.outputs.failed }}
-            
+
             **Changes made:**
             - Fixed Python syntax errors (missing colons, invalid assignments)
             - Corrected import statements and function definitions
             - Applied minimal fixes to resolve CI failures
-            
+
             The CI will re-run automatically. If workflows don't trigger, configure a PAT_TOKEN secret with workflow permissions. If issues persist, manual intervention may be required.
-            
+
             <details>
             <summary>Workflow Details</summary>
-            
+
             - **Workflow:** ${{ github.workflow }}
             - **Run:** #${{ github.run_number }}
             - **Commit:** \`${context.sha.substring(0, 7)}\`
             </details>`;
-            
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -607,54 +607,54 @@ jobs:
           script: |
             const head = "${{ steps.branch.outputs.branch }}";
             const base = "${{ steps.pick.outputs.base_ref }}";
-            
+
             // Check if PR already exists
             const { data: prs } = await github.rest.pulls.list({
-              owner: context.repo.owner, 
-              repo: context.repo.repo, 
+              owner: context.repo.owner,
+              repo: context.repo.repo,
               state: 'open',
               head: `${context.repo.owner}:${head}`
             });
-            
+
             if (prs.length > 0) {
               core.info(`PR already exists: ${prs[0].html_url}`);
               return;
             }
-            
+
             // Create new PR
             const prBody = `🤖 **Automated CI Fixes**
-            
+
             This PR contains automated fixes for failing CI jobs in the original PR.
-            
+
             **Target PR:** ${{ steps.pick.outputs.pr_url }}
             **Failed Jobs:** ${{ steps.details.outputs.failed }}
-            
+
             ## Changes made
             - Fixed Python syntax errors (missing colons, invalid assignments)
-            - Corrected import statements and function definitions  
+            - Corrected import statements and function definitions
             - Applied minimal fixes to resolve CI failures
             - All changes are targeted at making tests pass
-            
+
             ## Next Steps
             1. Review the changes in this PR
             2. If approved, merge this PR
             3. The fixes will be available for the original PR
-            
+
             ---
             *Generated by ${{ github.workflow }} #${{ github.run_number }}*`;
-            
+
             try {
               const { data: pr } = await github.rest.pulls.create({
-                owner: context.repo.owner, 
+                owner: context.repo.owner,
                 repo: context.repo.repo,
                 title: `chore(ci): auto-fix CI failures for ${{ steps.pick.outputs.head_ref }}`,
                 head: head,
                 base: base,
                 body: prBody
               });
-              
+
               core.info(`✅ Created fix PR: ${pr.html_url}`);
-              
+
               // Add labels if they exist
               try {
                 await github.rest.issues.addLabels({
@@ -666,7 +666,7 @@ jobs:
               } catch (labelError) {
                 core.info('Could not add labels (labels may not exist)');
               }
-              
+
             } catch (error) {
               core.setFailed(`Failed to create PR: ${error.message}`);
             }
@@ -681,7 +681,7 @@ jobs:
           echo "Claude Status: ${{ steps.claude.outcome }}"
           echo "PR Number: ${{ steps.pick.outputs.number }}"
           echo "::endgroup::"
-          
+
           if [ "${{ steps.claude.outcome }}" = "success" ]; then
             echo "✅ Workflow completed successfully"
           elif [ "${{ steps.claude.outcome }}" = "failure" ]; then
