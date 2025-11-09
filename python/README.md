@@ -1,4 +1,28 @@
-# Python Project Setup
+<div align="center">
+
+# ⚡ Python Project Setup
+
+<p align="center">
+  <strong>Modern Python development with UV package manager and Ruff linting</strong><br/>
+  <em>10-100x faster than traditional tooling</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.9+"/>
+  <img src="https://img.shields.io/badge/UV-Package_Manager-DE5FE9?style=for-the-badge&logo=astral&logoColor=white" alt="UV"/>
+  <img src="https://img.shields.io/badge/Ruff-Linter-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff"/>
+  <img src="https://img.shields.io/badge/pytest-Testing-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" alt="pytest"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/mypy-Type_Checking-2A6DB2?style=flat-square&logo=python&logoColor=white" alt="mypy"/>
+  <img src="https://img.shields.io/badge/bandit-Security-black?style=flat-square&logo=python&logoColor=white" alt="bandit"/>
+  <img src="https://img.shields.io/badge/coverage-Reports-success?style=flat-square&logo=codecov&logoColor=white" alt="coverage"/>
+</p>
+
+</div>
+
+---
 
 This directory contains a modern Python project setup with **UV** package manager and **Ruff** for ultra-fast development workflows.
 
