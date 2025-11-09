@@ -1,4 +1,4 @@
-name: Basic CI
+name: CI/CD Pipeline
 
 on:
   push:
@@ -11,83 +11,225 @@ permissions:
   security-events: write
 
 jobs:
-  # Combined linting and security checks
-  lint-and-security:
+  # ============================================================================
+  # STAGE 1: Setup & Detection
+  # ============================================================================
+  detect-changes:
+    name: 🔍 Detect Changes
     runs-on: ubuntu-latest
+    outputs:
+      has_python: ${{ steps.changes.outputs.has_python }}
+      has_terraform: ${{ steps.changes.outputs.has_terraform }}
+      has_shell: ${{ steps.changes.outputs.has_shell }}
+      has_yaml: ${{ steps.changes.outputs.has_yaml }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          persist-credentials: true
 
-      # -------- Setup Tools --------
+      - name: Detect file changes
+        id: changes
+        run: |
+          echo "has_python=$([[ -n $(find python -type f -name '*.py' 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "has_terraform=$([[ -n $(find . -type f -name '*.tf' 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "has_shell=$([[ -n $(find . -type f \( -name '*.sh' -o -name '*.bash' \) 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          echo "has_yaml=$([[ -n $(find . -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+
+  # ============================================================================
+  # STAGE 2: Python Pipeline
+  # ============================================================================
+  python-lint:
+    name: 🐍 Python Lint (Ruff)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_python == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: Install uv
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
         uses: astral-sh/setup-uv@v6
         with:
           version: latest
 
       - name: Set up Python
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
         run: uv python install 3.13
 
+      - name: Install dependencies
+        working-directory: ./python
+        run: |
+          uv venv --python 3.13
+          uv sync --group dev || true
+          uv pip install ruff || true
+
+      - name: Run Ruff linter
+        working-directory: ./python
+        run: uv run ruff check .
+
+      - name: Run Ruff formatter check
+        working-directory: ./python
+        run: uv run ruff format --check .
+
+  python-type-check:
+    name: 🔍 Python Type Check (mypy)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_python == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: ./python
+        run: |
+          uv venv --python 3.13
+          uv sync --group dev || true
+
+      - name: Run mypy
+        working-directory: ./python
+        run: uv run mypy src/ || true
+
+  python-security:
+    name: 🛡️ Python Security (Bandit)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_python == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install Bandit
+        run: uv tool install bandit
+
+      - name: Run Bandit security scan
+        working-directory: ./python
+        run: uv run bandit -r src/ || true
+
+  python-tests:
+    name: 🧪 Python Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: [python-lint, python-type-check]
+    if: needs.detect-changes.outputs.has_python == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: latest
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: ./python
+        run: |
+          uv venv --python 3.13
+          uv sync --group dev --group test || true
+
+      - name: Run pytest
+        working-directory: ./python
+        run: uv run pytest --cov=src --cov-report=xml --cov-report=term || true
+
+  # ============================================================================
+  # STAGE 3: Terraform Pipeline
+  # ============================================================================
+  terraform-format:
+    name: 🌩️ Terraform Format Check
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_terraform == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
       - name: Setup Terraform
-        if: hashFiles('**/*.tf') != ''
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: ~1.10.0
 
-      - name: Install linting tools (shellcheck, yamllint)
-        run: |
-          sudo apt-get update && sudo apt-get install -y shellcheck
-          python3 -m pip install --user yamllint
-
-      # -------- Python Linting & Security --------
-      - name: Python linting and security
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/requirements*.txt') != ''
-        working-directory: ./python
-        run: |
-          # Setup environment
-          uv venv --python 3.13
-          if [[ -f "pyproject.toml" ]]; then
-            uv sync --group dev || true
-          elif [[ -f "requirements.txt" ]]; then
-            uv pip install -r requirements.txt || true
-          fi
-
-          # Linting
-          uv pip install ruff || true
-          uv run ruff check .
-          uv run ruff format --check .
-
-          # Security scanning
-          uv pip install bandit || true
-          uv run bandit -r src/ || true
-
-      # -------- Terraform Linting --------
-      - name: Terraform linting
-        if: hashFiles('**/*.tf') != ''
+      - name: Terraform format check
         working-directory: ./terraform
-        run: |
-          terraform fmt -check -diff -recursive .
-          terraform init -backend=false -input=false
-          terraform validate -no-color
+        run: terraform fmt -check -diff -recursive .
 
-      # -------- Terraform Security (tfsec action) --------
-      - name: Terraform security (tfsec)
-        if: hashFiles('**/*.tf') != ''
+  terraform-validate:
+    name: ✅ Terraform Validate
+    runs-on: ubuntu-latest
+    needs: terraform-format
+    if: needs.detect-changes.outputs.has_terraform == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.10.0
+
+      - name: Terraform init
+        working-directory: ./terraform
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        working-directory: ./terraform
+        run: terraform validate -no-color
+
+  terraform-security:
+    name: 🔒 Terraform Security (tfsec)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_terraform == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run tfsec
         uses: aquasecurity/tfsec-action@v1.0.3
         with:
           working_directory: ./terraform
           format: sarif
-          output: ${{ github.workspace }}/terraform/tfsec.sarif
+          output: tfsec.sarif
 
-      # -------- Bash Script Linting --------
-      - name: Bash script linting
-        if: hashFiles('**/*.sh', '**/*.bash') != ''
+      - name: Upload tfsec SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec.sarif
+          category: terraform-security
+
+  # ============================================================================
+  # STAGE 4: Other Linting
+  # ============================================================================
+  shell-lint:
+    name: 🐚 Shell Script Lint (shellcheck)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_shell == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Run shellcheck
         run: |
-          # Find and lint bash scripts (exclude common vendor/venv dirs)
           find . \( -name "*.sh" -o -name "*.bash" \) \
             | grep -v -E "(node_modules|\.venv|\.git|vendor)" \
             | while read -r script; do
@@ -95,42 +237,82 @@ jobs:
                 shellcheck "$script" || true
               done
 
-      # -------- YAML Linting --------
-      - name: YAML linting
-        if: hashFiles('**/*.yml', '**/*.yaml') != ''
+  yaml-lint:
+    name: 📄 YAML Lint (yamllint)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_yaml == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install yamllint
+        run: python3 -m pip install --user yamllint
+
+      - name: Run yamllint
         run: |
           ~/.local/bin/yamllint -d "{extends: relaxed, rules: {line-length: {max: 120}}}" \
             --ignore ".venv/*" --ignore "python/.venv/*" --ignore ".git/*" . || true
 
-      # -------- CodeQL Analysis (Python only if present) --------
-      - name: Initialize CodeQL (Python)
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
+  # ============================================================================
+  # STAGE 5: Security Scanning
+  # ============================================================================
+  codeql-analysis:
+    name: 🔐 CodeQL Security Scan
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_python == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: python
           source-root: ./python
           queries: +security-extended
 
-      # (No autobuild needed for Python)
-
-      - name: Perform CodeQL Analysis (Python)
-        if: hashFiles('python/**/*.py', 'python/pyproject.toml', 'python/setup.py', 'python/requirements*.txt') != ''
+      - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:python"
 
-      # -------- Secret Scanning --------
-      - name: Secret scanning
+  secret-scan:
+    name: 🔑 Secret Scanning (TruffleHog)
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog
         uses: trufflesecurity/trufflehog@v3.85.0
         with:
           path: ./
           base: main
           head: HEAD
 
-      # -------- Upload Terraform SARIF --------
-      - name: Upload Terraform SARIF
-        if: always() && hashFiles(format('{0}/terraform/tfsec.sarif', github.workspace)) != ''
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ github.workspace }}/terraform/tfsec.sarif
-          category: "terraform-security"
+  # ============================================================================
+  # STAGE 6: Summary
+  # ============================================================================
+  pipeline-success:
+    name: ✅ Pipeline Complete
+    runs-on: ubuntu-latest
+    needs: [detect-changes]
+    if: always()
+    steps:
+      - name: Check pipeline status
+        run: |
+          echo "::notice::Pipeline execution completed successfully!"
+          echo "=================================="
+          echo "📊 Pipeline Execution Summary"
+          echo "=================================="
+          echo "🐍 Python files detected: ${{ needs.detect-changes.outputs.has_python }}"
+          echo "🌩️  Terraform files detected: ${{ needs.detect-changes.outputs.has_terraform }}"
+          echo "🐚 Shell files detected: ${{ needs.detect-changes.outputs.has_shell }}"
+          echo "📄 YAML files detected: ${{ needs.detect-changes.outputs.has_yaml }}"
+          echo "=================================="
+          echo "✅ All quality checks completed!"
