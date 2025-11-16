@@ -30,6 +30,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      statuses: write # Required for GitHub Status Reporter to post individual linter statuses
     steps:
       # Git Checkout
       - name: Checkout Code
