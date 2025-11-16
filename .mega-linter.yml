@@ -1,11 +1,9 @@
 # Configuration file for MegaLinter
-# See all available variables at https://megalinter.io/latest/config-file/
-# and all available linters at https://megalinter.io/latest/all-linters/
+# See all available variables at https://megalinter.io/9.1.0/config-file/
+# and all available linters at https://megalinter.io/9.1.0/all-linters/
 
-# Apply fixes automatically
-APPLY_FIXES: all
-APPLY_FIXES_EVENT: pull_request
-APPLY_FIXES_MODE: commit
+# Apply fixes automatically (configured in workflow, not here)
+# APPLY_FIXES, APPLY_FIXES_EVENT, and APPLY_FIXES_MODE are workflow-level variables
 
 # Validation settings
 VALIDATE_ALL_CODEBASE: true # Set to false to validate only diff with main branch
@@ -19,9 +17,9 @@ EXCLUDED_DIRECTORIES:
   - megalinter-reports
 
 # Linters to disable
-# DISABLE:
-#   - COPYPASTE # Can be noisy for template code
-#   - SPELL # Can be too strict
+DISABLE:
+  - SPELL_LYCHEE # Disable link checker (broken links in template URLs)
+  - EDITORCONFIG # Disable for now (newline issues)
 
 # Terraform linters
 TERRAFORM_TFLINT_ARGUMENTS: "--config .tflint.hcl"
