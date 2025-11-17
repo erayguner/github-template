@@ -272,8 +272,8 @@ artifacts:
 # Create trigger for main branch
 gcloud builds triggers create github \
   --name="terraform-ci-cd-main" \
-  --repo-name="YOUR_REPO_NAME" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-name="github-template" \
+  --repo-owner="erayguner" \
   --branch-pattern="^main$" \
   --build-config="cloudbuild.yaml" \
   --substitutions="_ENVIRONMENT=prod,_PROJECT_NAME=my-project"
@@ -281,8 +281,8 @@ gcloud builds triggers create github \
 # Create trigger for pull requests
 gcloud builds triggers create github \
   --name="terraform-ci-cd-pr" \
-  --repo-name="YOUR_REPO_NAME" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-name="github-template" \
+  --repo-owner="erayguner" \
   --pull-request-pattern="^main$" \
   --build-config="cloudbuild.yaml" \
   --substitutions="_ENVIRONMENT=dev,_PROJECT_NAME=my-project" \
@@ -322,8 +322,8 @@ Create separate triggers for different environments:
 # Development trigger (dev branch)
 gcloud builds triggers create github \
   --name="terraform-dev" \
-  --repo-name="YOUR_REPO_NAME" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-name="github-template" \
+  --repo-owner="erayguner" \
   --branch-pattern="^dev$" \
   --build-config="cloudbuild.yaml" \
   --substitutions="_ENVIRONMENT=dev,_PROJECT_NAME=my-project-dev"
@@ -331,8 +331,8 @@ gcloud builds triggers create github \
 # Staging trigger (staging branch)
 gcloud builds triggers create github \
   --name="terraform-staging" \
-  --repo-name="YOUR_REPO_NAME" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-name="github-template" \
+  --repo-owner="erayguner" \
   --branch-pattern="^staging$" \
   --build-config="cloudbuild.yaml" \
   --substitutions="_ENVIRONMENT=staging,_PROJECT_NAME=my-project-staging"
@@ -340,8 +340,8 @@ gcloud builds triggers create github \
 # Production trigger (main branch with manual approval)
 gcloud builds triggers create github \
   --name="terraform-prod" \
-  --repo-name="YOUR_REPO_NAME" \
-  --repo-owner="YOUR_GITHUB_USERNAME" \
+  --repo-name="github-template" \
+  --repo-owner="erayguner" \
   --branch-pattern="^main$" \
   --build-config="cloudbuild.yaml" \
   --substitutions="_ENVIRONMENT=prod,_PROJECT_NAME=my-project-prod" \

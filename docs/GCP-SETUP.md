@@ -18,7 +18,7 @@ Get started in 3 steps:
 
 ```bash
 # 1. Clone or use this template
-git clone https://github.com/YOUR_USERNAME/github-template.git
+git clone https://github.com/erayguner/github-template.git
 cd github-template
 
 # 2. Run the automated setup script

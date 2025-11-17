@@ -315,7 +315,7 @@ gcloud billing budgets create \
 - [GCP Best Practices](https://cloud.google.com/docs/enterprise/best-practices-for-enterprise-organizations)
 
 ### Support
-- GitHub Issues: [Report issues](https://github.com/YOUR_USERNAME/github-template/issues)
+- GitHub Issues: [Report issues](https://github.com/erayguner/github-template/issues)
 - GCP Support: https://cloud.google.com/support
 - Terraform Community: https://discuss.hashicorp.com/
 
