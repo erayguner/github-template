@@ -13,6 +13,9 @@
   <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml">
     <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg" alt="Security Analysis"/>
   </a>
+  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/mega-linter.yml">
+    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/mega-linter.yml/badge.svg" alt="MegaLinter"/>
+  </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
   </a>
@@ -24,6 +27,7 @@
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python 3.11+"/>
   <img src="https://img.shields.io/badge/UV-Package_Manager-DE5FE9?logo=astral&logoColor=white" alt="UV"/>
   <img src="https://img.shields.io/badge/Ruff-Linter-D7FF64?logo=ruff&logoColor=black" alt="Ruff"/>
+  <img src="https://img.shields.io/badge/MegaLinter-Enabled-brightgreen?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTEyIDJMMyA3djZjMCA1LjU1IDMuODQgMTAuNzQgOSAxMiA1LjE2LTEuMjYgOS02LjQ1IDktMTJWN2wtOS01em0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==" alt="MegaLinter"/>
   <img src="https://img.shields.io/badge/Security-tfsec_checkov-2B9348?logo=github&logoColor=white" alt="Security Scanning"/>
 </p>
 
@@ -66,11 +70,12 @@ This automatically configures:
 ## ✨ Key Features
 
 - 🛡️ **Security-First**: CodeQL, tfsec, checkov, GitLeaks, Dependabot
-- ⚡ **Fast Tooling**: UV package manager, Ruff linting
+- ⚡ **Fast Tooling**: UV package manager, Ruff linting, MegaLinter
 - 🌩️ **Multi-Cloud**: AWS, GCP, or hybrid support
 - 🔄 **Zero-Config**: Automatic project detection
 - 📦 **Automated Setup**: One-command GCP project initialization
 - 🔒 **Production-Ready**: Security scanning, state management, and best practices
+- 🔍 **Comprehensive Linting**: MegaLinter runs 70+ linters for code quality
 
 ## 📁 Repository Structure
 
