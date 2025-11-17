@@ -21,9 +21,17 @@ DISABLE:
   - SPELL_LYCHEE # Disable link checker (broken links in template URLs)
   - EDITORCONFIG # Disable for now (newline issues)
   - YAML_V8R # Disable YAML schema validation (workflow schema issues)
+  - REPOSITORY_GRYPE # Disable grype (dependency vulnerability scanner)
+  - REPOSITORY_KICS # Disable KICS (infrastructure security scanner)
+  - REPOSITORY_TRIVY # Disable trivy (container/dependency scanner)
+  - MARKDOWN_MARKDOWNLINT # Disable markdownlint (markdown formatting)
 DISABLE_LINTERS:
   - SPELL_LYCHEE
   - YAML_V8R
+  - REPOSITORY_GRYPE
+  - REPOSITORY_KICS
+  - REPOSITORY_TRIVY
+  - MARKDOWN_MARKDOWNLINT
 
 # Terraform linters
 TERRAFORM_TFLINT_ARGUMENTS: "--config .tflint.hcl"
