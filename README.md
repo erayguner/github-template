@@ -57,6 +57,7 @@ Get your GCP Terraform CI/CD pipeline running with just your project ID:
 
 This automatically configures:
 - ✅ GCP project with required APIs
+- ✅ Workload Identity Federation (keyless authentication)
 - ✅ Service account with proper IAM roles
 - ✅ GCS buckets for Terraform state, logs, and artifacts
 - ✅ Terraform backend configuration
@@ -69,12 +70,12 @@ This automatically configures:
 
 ## ✨ Key Features
 
-- 🛡️ **Security-First**: CodeQL, tfsec, checkov, GitLeaks, Dependabot
+- 🛡️ **Security-First**: Workload Identity Federation (keyless auth), CodeQL, tfsec, checkov, GitLeaks, Dependabot
 - ⚡ **Fast Tooling**: UV package manager, Ruff linting, MegaLinter
 - 🌩️ **Multi-Cloud**: AWS, GCP, or hybrid support
 - 🔄 **Zero-Config**: Automatic project detection
 - 📦 **Automated Setup**: One-command GCP project initialization
-- 🔒 **Production-Ready**: Security scanning, state management, and best practices
+- 🔒 **Production-Ready**: No service account keys, security scanning, state management, and best practices
 - 🔍 **Comprehensive Linting**: MegaLinter runs 70+ linters for code quality
 
 ## 📁 Repository Structure

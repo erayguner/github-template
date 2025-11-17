@@ -122,16 +122,24 @@ gcloud services enable cloudbuild.googleapis.com
 gcloud services list --enabled --project=$GCP_PROJECT_ID
 ```
 
-## GitHub Secrets Configuration
+## GitHub Workload Identity Federation Setup
 
-### Create Service Account for GitHub Actions
+### Why Workload Identity Federation?
+
+Workload Identity Federation is the **secure, modern way** to authenticate GitHub Actions to GCP:
+- ✅ **No service account keys** to manage or rotate
+- ✅ **Short-lived tokens** that expire automatically
+- ✅ **Better security posture** - no long-lived credentials
+- ✅ **Automatic token management** by GitHub and GCP
+
+### Step 1: Create Service Account
 
 ```bash
-# Create service account
+# Create service account for GitHub Actions
 export SA_NAME="github-actions-terraform"
 gcloud iam service-accounts create $SA_NAME \
   --display-name="GitHub Actions Terraform" \
-  --description="Service account for GitHub Actions CI/CD"
+  --description="Service account for GitHub Actions CI/CD via Workload Identity"
 
 # Grant necessary permissions
 export SA_EMAIL="${SA_NAME}@${GCP_PROJECT_ID}.iam.gserviceaccount.com"
@@ -147,31 +155,77 @@ gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
 gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
   --member="serviceAccount:${SA_EMAIL}" \
   --role="roles/storage.admin"
-
-# Create and download key
-gcloud iam service-accounts keys create github-actions-key.json \
-  --iam-account=$SA_EMAIL
-
-# Display the key (copy this to GitHub Secrets)
-cat github-actions-key.json | base64
 ```
 
-### Add Secrets to GitHub Repository
+### Step 2: Create Workload Identity Pool
+
+```bash
+# Enable IAM Credentials API
+gcloud services enable iamcredentials.googleapis.com
+
+# Create Workload Identity Pool
+gcloud iam workload-identity-pools create "github-pool" \
+  --project="${GCP_PROJECT_ID}" \
+  --location="global" \
+  --display-name="GitHub Actions Pool"
+
+# Create Workload Identity Provider
+gcloud iam workload-identity-pools providers create-oidc "github-provider" \
+  --project="${GCP_PROJECT_ID}" \
+  --location="global" \
+  --workload-identity-pool="github-pool" \
+  --display-name="GitHub Provider" \
+  --attribute-mapping="google.subject=assertion.sub,attribute.actor=assertion.actor,attribute.repository=assertion.repository,attribute.repository_owner=assertion.repository_owner" \
+  --attribute-condition="assertion.repository_owner == 'YOUR_GITHUB_USERNAME'" \
+  --issuer-uri="https://token.actions.githubusercontent.com"
+
+# Note: Replace YOUR_GITHUB_USERNAME with your actual GitHub username
+```
+
+### Step 3: Grant Service Account Access
+
+```bash
+# Get your GitHub repository details
+export GITHUB_REPO="YOUR_GITHUB_USERNAME/github-template"
+
+# Allow GitHub Actions to impersonate the service account
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --project="${GCP_PROJECT_ID}" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/$(gcloud projects describe ${GCP_PROJECT_ID} --format='value(projectNumber)')/locations/global/workloadIdentityPools/github-pool/attribute.repository/${GITHUB_REPO}"
+```
+
+### Step 4: Get Workload Identity Provider Name
+
+```bash
+# Get the full workload identity provider resource name
+export PROJECT_NUMBER=$(gcloud projects describe ${GCP_PROJECT_ID} --format='value(projectNumber)')
+export WORKLOAD_IDENTITY_PROVIDER="projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+
+echo "Workload Identity Provider: ${WORKLOAD_IDENTITY_PROVIDER}"
+echo "Service Account Email: ${SA_EMAIL}"
+```
+
+### Step 5: Configure GitHub Repository Variables
 
 1. Go to your GitHub repository
 2. Navigate to **Settings** > **Secrets and variables** > **Actions**
-3. Click **New repository secret**
-4. Add the following secrets:
+3. Click **Variables** tab, then **New repository variable**
+4. Add the following variables:
 
-| Secret Name             | Value                              | Description                                 |
-|-------------------------|------------------------------------|---------------------------------------------|
-| `GCP_PROJECT_ID`        | Your GCP project ID                | The project where resources will be created |
-| `GCP_SA_KEY`            | Base64-encoded service account key | Service account credentials (from above)    |
-| `TF_VAR_gcp_project_id` | Your GCP project ID                | Terraform variable for project ID           |
+| Variable Name                   | Value                                    | Description                    |
+|---------------------------------|------------------------------------------|--------------------------------|
+| `GCP_PROJECT_ID`                | Your GCP project ID                      | GCP project                    |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER`| Full workload identity provider path     | From step 4 above              |
+| `GCP_SERVICE_ACCOUNT`           | Service account email                    | From step 1 above              |
+| `TF_VAR_gcp_project_id`         | Your GCP project ID                      | Terraform variable             |
 
-**Important**: Delete the local key file after adding to GitHub:
-```bash
-rm github-actions-key.json
+**Example values:**
+```
+GCP_PROJECT_ID: my-terraform-project-12345
+GCP_WORKLOAD_IDENTITY_PROVIDER: projects/123456789/locations/global/workloadIdentityPools/github-pool/providers/github-provider
+GCP_SERVICE_ACCOUNT: github-actions-terraform@my-terraform-project-12345.iam.gserviceaccount.com
+TF_VAR_gcp_project_id: my-terraform-project-12345
 ```
 
 ## Terraform Backend Setup
@@ -346,22 +400,34 @@ gcloud projects add-iam-policy-binding $GCP_PROJECT_ID \
   --role="roles/REQUIRED_ROLE"
 ```
 
-#### 4. GitHub Actions Authentication Fails
+#### 4. GitHub Actions Workload Identity Authentication Fails
 
 **Solution**:
-1. Verify `GCP_SA_KEY` secret is base64-encoded
-2. Check service account has necessary permissions
-3. Ensure project ID matches in secrets
+1. Verify all GitHub repository variables are set correctly
+2. Check workload identity pool and provider exist
+3. Ensure service account has proper IAM bindings
 
 ```bash
-# Recreate service account key
-gcloud iam service-accounts keys create new-key.json \
-  --iam-account=$SA_EMAIL
+# Verify workload identity pool exists
+gcloud iam workload-identity-pools describe github-pool \
+  --location=global \
+  --project=$GCP_PROJECT_ID
 
-# Encode and update GitHub secret
-cat new-key.json | base64 -w 0
+# Verify provider exists
+gcloud iam workload-identity-pools providers describe github-provider \
+  --location=global \
+  --workload-identity-pool=github-pool \
+  --project=$GCP_PROJECT_ID
 
-rm new-key.json
+# Check service account IAM policy
+gcloud iam service-accounts get-iam-policy $SA_EMAIL \
+  --project=$GCP_PROJECT_ID
+
+# Re-add workload identity user binding if missing
+gcloud iam service-accounts add-iam-policy-binding "${SA_EMAIL}" \
+  --project="${GCP_PROJECT_ID}" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/projects/${PROJECT_NUMBER}/locations/global/workloadIdentityPools/github-pool/attribute.repository/${GITHUB_REPO}"
 ```
 
 #### 5. Terraform State Locking Issues
@@ -391,13 +457,14 @@ gsutil rm gs://$TF_STATE_BUCKET/terraform/state/default.tflock
 
 ## Security Best Practices
 
-1. **Never commit service account keys** to version control
+1. **Use Workload Identity Federation** instead of service account keys (no long-lived credentials)
 2. **Use least-privilege IAM roles** for service accounts
 3. **Enable VPC Service Controls** for production environments
-4. **Rotate service account keys** regularly (90 days recommended)
+4. **Restrict workload identity pools** to specific repositories/branches using attribute conditions
 5. **Enable audit logging** for all API calls
 6. **Use separate projects** for different environments
 7. **Implement billing alerts** to avoid unexpected costs
+8. **Monitor workload identity usage** via Cloud Logging
 
 ## Cost Optimization
 
