@@ -8,13 +8,13 @@
 
 <p align="center">
   <a href="https://github.com/erayguner/github-template/actions/workflows/ci.yml">
-    <img src="https://github.com/erayguner/github-template/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"/>
+    <img src="https://github.com/erayguner/github-template/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI/CD Pipeline"/>
   </a>
   <a href="https://github.com/erayguner/github-template/actions/workflows/security.yml">
-    <img src="https://github.com/erayguner/github-template/actions/workflows/security.yml/badge.svg" alt="Security Analysis"/>
+    <img src="https://github.com/erayguner/github-template/actions/workflows/security.yml/badge.svg?branch=main" alt="Security Analysis"/>
   </a>
   <a href="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml">
-    <img src="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml/badge.svg" alt="MegaLinter"/>
+    <img src="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml/badge.svg?branch=main" alt="MegaLinter"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
