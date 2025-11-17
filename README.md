@@ -7,14 +7,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml">
-    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/ci.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI/CD Pipeline"/>
   </a>
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml">
-    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg" alt="Security Analysis"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/security.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/security.yml/badge.svg?branch=main" alt="Security Analysis"/>
   </a>
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/mega-linter.yml">
-    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/mega-linter.yml/badge.svg" alt="MegaLinter"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml/badge.svg?branch=main" alt="MegaLinter"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
@@ -114,7 +114,7 @@ Before you begin, ensure you have the following installed:
 #### 1. Create from Template
 Use this repository as a GitHub template or clone it:
 ```bash
-git clone https://github.com/YOUR_USERNAME/github-template.git
+git clone https://github.com/erayguner/github-template.git
 cd github-template
 ```
 

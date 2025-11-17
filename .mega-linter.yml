@@ -19,6 +19,7 @@ EXCLUDED_DIRECTORIES:
 # Linters to disable
 DISABLE:
   - SPELL_LYCHEE # Disable link checker (broken links in template URLs)
+  - SPELL_CSPELL # Disable cspell (spelling checker)
   - EDITORCONFIG # Disable for now (newline issues)
   - YAML_V8R # Disable YAML schema validation (workflow schema issues)
   - REPOSITORY_GRYPE # Disable grype (dependency vulnerability scanner)
@@ -27,6 +28,7 @@ DISABLE:
   - MARKDOWN_MARKDOWNLINT # Disable markdownlint (markdown formatting)
 DISABLE_LINTERS:
   - SPELL_LYCHEE
+  - SPELL_CSPELL
   - YAML_V8R
   - REPOSITORY_GRYPE
   - REPOSITORY_KICS
