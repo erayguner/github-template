@@ -1,4 +1,28 @@
-# Python Project Setup
+<div align="center">
+
+# ⚡ Python Project Setup
+
+<p align="center">
+  <strong>Modern Python development with UV package manager and Ruff linting</strong><br/>
+  <em>10-100x faster than traditional tooling</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+"/>
+  <img src="https://img.shields.io/badge/UV-Package_Manager-DE5FE9?style=for-the-badge&logo=astral&logoColor=white" alt="UV"/>
+  <img src="https://img.shields.io/badge/Ruff-Linter-D7FF64?style=for-the-badge&logo=ruff&logoColor=black" alt="Ruff"/>
+  <img src="https://img.shields.io/badge/pytest-Testing-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white" alt="pytest"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/mypy-Type_Checking-2A6DB2?style=flat-square&logo=python&logoColor=white" alt="mypy"/>
+  <img src="https://img.shields.io/badge/bandit-Security-black?style=flat-square&logo=python&logoColor=white" alt="bandit"/>
+  <img src="https://img.shields.io/badge/coverage-Reports-success?style=flat-square&logo=codecov&logoColor=white" alt="coverage"/>
+</p>
+
+</div>
+
+---
 
 This directory contains a modern Python project setup with **UV** package manager and **Ruff** for ultra-fast development workflows.
 
@@ -8,6 +32,74 @@ This directory contains a modern Python project setup with **UV** package manage
 - **Ruff**: 150-1000x faster than traditional Python tools (Black, Flake8, isort)
 - **Modern Standards**: Uses pyproject.toml and dependency groups
 - **Enterprise Ready**: Security scanning, type checking, comprehensive testing
+
+## 🔄 **Linting & Quality Pipeline**
+
+Our code quality workflow integrates multiple tools that work together seamlessly:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        Code Quality Pipeline                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    Your Code (*.py)
+         │
+         ├──────────────┬──────────────┬──────────────┬──────────────┐
+         ▼              ▼              ▼              ▼              ▼
+    ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐   ┌─────────┐
+    │  Ruff   │   │  mypy   │   │ Bandit  │   │ pytest  │   │ Safety  │
+    │ Linter  │   │  Type   │   │Security │   │  Tests  │   │  Deps   │
+    └─────────┘   └─────────┘   └─────────┘   └─────────┘   └─────────┘
+         │              │              │              │              │
+         ├──────────────┼──────────────┼──────────────┼──────────────┤
+         ▼              ▼              ▼              ▼              ▼
+
+    • Style         • Types       • Vulns       • Coverage    • CVEs
+    • Format        • Annotations • Hardcoded   • Unit Tests  • Outdated
+    • Imports       • Contracts   • Injection   • Integration • Licenses
+    • Complexity    • Generics    • Crypto      • Mocking     • Conflicts
+
+         │              │              │              │              │
+         └──────────────┴──────────────┴──────────────┴──────────────┘
+                                     │
+                                     ▼
+                          ┌──────────────────┐
+                          │  Pre-commit Hook │
+                          │  (GitLeaks etc.) │
+                          └──────────────────┘
+                                     │
+                                     ▼
+                          ┌──────────────────┐
+                          │   CI/CD Pipeline │
+                          │   (GitHub Actions)│
+                          └──────────────────┘
+                                     │
+                                     ▼
+                              ✅ Production Ready
+```
+
+### **Tool Responsibilities**
+
+| Tool | Purpose | What It Checks | Speed |
+|------|---------|----------------|-------|
+| **Ruff** | Linting & Formatting | Style, imports, complexity, best practices | ⚡ 150-1000x faster |
+| **mypy** | Type Checking | Type hints, type safety, contracts | 🔍 Static analysis |
+| **Bandit** | Security Scanning | SQL injection, hardcoded secrets, crypto | 🛡️ Security focused |
+| **pytest** | Testing | Unit tests, integration, coverage | 🧪 Runtime validation |
+| **Safety** | Dependency Security | Known vulnerabilities in packages | 📦 CVE database |
+| **Pre-commit** | Git Hooks | Secrets, large files, syntax | 🚫 Prevention |
+
+### **Replaced Legacy Tools**
+
+Ruff alone replaces these 8+ tools:
+- ❌ **Black** → ✅ Ruff Format
+- ❌ **Flake8** → ✅ Ruff Check
+- ❌ **isort** → ✅ Ruff Check (I rules)
+- ❌ **pyupgrade** → ✅ Ruff Check (UP rules)
+- ❌ **pydocstyle** → ✅ Ruff Check (D rules)
+- ❌ **pylint** → ✅ Ruff Check (PL rules)
+- ❌ **autoflake** → ✅ Ruff Check (F rules)
+- ❌ **pycodestyle** → ✅ Ruff Check (E/W rules)
 
 ## 🛠️ **Quick Start**
 

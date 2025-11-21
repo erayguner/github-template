@@ -11,14 +11,16 @@ def greet(name: str) -> str:   # Missing colon - should trigger auto-fix
 
 # --- Runtime Error ---
 def divide(a: float, b: float) -> float:
+    if b == 0:
+        raise ValueError("Cannot divide by zero")
     return a / b
 
-result = divide(10, 0)  # Invalid syntax - should trigger auto-fix
+result = divide(10, 2)  # Fixed: changed from divide(10, 0) to avoid ZeroDivisionError
 
 
 # --- Logic Error (test will fail) ---
 def multiply(a: float, b: float) -> float:
-    return a - b  # Wrong on purpose
+    return a * b  # Fixed: changed from a - b to a * b
 
 
 # --- Fake test function ---

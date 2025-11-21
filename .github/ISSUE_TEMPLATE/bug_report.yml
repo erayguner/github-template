@@ -63,8 +63,8 @@ body:
       description: Please provide relevant environment information
       placeholder: |
         - OS: [e.g. Ubuntu 20.04, macOS 12.0, Windows 11]
-        - Python version: [e.g. 3.9.7]
-        - Terraform version: [e.g. 1.6.0]
+        - Python version: [e.g. 3.13.0]
+        - Terraform version: [e.g. 1.10.0]
         - Pre-commit version: [e.g. 2.20.0]
       render: markdown
     validations:

@@ -24,13 +24,12 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 dependencies = [
     "requests>=2.31.0,<3.0.0",
     "pydantic>=2.0.0,<3.0.0",
@@ -137,7 +136,7 @@ exclude = ["tests*"]
 # Ruff configuration (2025 standard - replaces Black, isort, Flake8)
 [tool.ruff]
 line-length = 88
-target-version = "py39"
+target-version = "py311"
 include = ["*.py", "*.pyi", "**/pyproject.toml"]
 exclude = [
     ".eggs",
@@ -206,13 +205,10 @@ ignore = [
 fixable = ["ALL"]
 unfixable = []
 
+per-file-ignores = {"tests/**" = ["S101", "T201", "PLR2004", "ARG001"], "**/conftest.py" = ["F401"], "**/settings.py" = ["S105"]}
+
 [tool.ruff.lint.mccabe]
 max-complexity = 10
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "T201", "PLR2004", "ARG001"]
-"**/conftest.py" = ["F401"]
-"**/settings.py" = ["S105"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["src"]
@@ -227,7 +223,7 @@ line-ending = "auto"
 
 # mypy configuration
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

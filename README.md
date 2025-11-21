@@ -1,8 +1,39 @@
+<div align="center">
+
 # 🚀 Multi-Language Repository Template
 
-[![CI/CD Pipeline](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml)
-[![Security Analysis](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg)](https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<p align="center">
+  <strong>Production-ready GitHub template with automated CI/CD, security scanning, and modern development workflows</strong>
+</p>
+
+<p align="center">
+  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml">
+    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"/>
+  </a>
+  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml">
+    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg" alt="Security Analysis"/>
+  </a>
+  <a href="https://opensource.org/licenses/MIT">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
+  </a>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python 3.11+"/>
+  <img src="https://img.shields.io/badge/Terraform-1.10+-623CE4?logo=terraform&logoColor=white" alt="Terraform 1.10+"/>
+  <img src="https://img.shields.io/badge/UV-Package_Manager-DE5FE9?logo=astral&logoColor=white" alt="UV"/>
+  <img src="https://img.shields.io/badge/Ruff-Linter-D7FF64?logo=ruff&logoColor=black" alt="Ruff"/>
+  <img src="https://img.shields.io/badge/CodeQL-Security-2B9348?logo=github&logoColor=white" alt="CodeQL"/>
+</p>
+
+<p align="center">
+  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-key-features">Features</a> •
+  <a href="#-supported-technologies">Technologies</a> •
+  <a href="#license">License</a>
+</p>
+
+</div>
 
 ---
 
@@ -44,9 +75,9 @@ Production-ready GitHub template for Terraform and Python projects with automate
 ### Prerequisites
 
 Before you begin, ensure you have the following installed:
-- **Python 3.9+** - [Download here](https://www.python.org/downloads/)
+- **Python 3.11+** - [Download here](https://www.python.org/downloads/)
 - **UV** - Ultra-fast Python package manager: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- **Terraform 1.6+** - [Download here](https://www.terraform.io/downloads)
+- **Terraform 1.10+** - [Download here](https://www.terraform.io/downloads)
 - **Git** - [Download here](https://git-scm.com/downloads)
 
 ### Setup Steps

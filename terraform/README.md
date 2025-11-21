@@ -1,6 +1,37 @@
-# Terraform Configuration
+<div align="center">
+
+# 🌩️ Terraform Configuration
+
+<p align="center">
+  <strong>Infrastructure as Code for Multi-Cloud Deployments</strong><br/>
+  <em>AWS • Google Cloud Platform • Multi-Cloud</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Terraform-1.10+-623CE4?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform 1.10+"/>
+  <img src="https://img.shields.io/badge/AWS-Supported-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="AWS"/>
+  <img src="https://img.shields.io/badge/GCP-Supported-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white" alt="GCP"/>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/tfsec-Security-00ADD8?style=flat-square&logo=terraform&logoColor=white" alt="tfsec"/>
+  <img src="https://img.shields.io/badge/checkov-Scanning-1B3C87?style=flat-square&logo=checkmarx&logoColor=white" alt="checkov"/>
+  <img src="https://img.shields.io/badge/IaC-Infrastructure_as_Code-purple?style=flat-square" alt="IaC"/>
+</p>
+
+</div>
+
+---
 
 This directory contains Terraform infrastructure as code configurations.
+
+> 📖 **For comprehensive documentation, see [TERRAFORM_GUIDE.md](./TERRAFORM_GUIDE.md)**
+
+## 📚 Documentation
+
+- **[TERRAFORM_GUIDE.md](./TERRAFORM_GUIDE.md)** - Complete Terraform guide with advanced usage
+- **[README-MultiCloud.md](./README-MultiCloud.md)** - Multi-cloud specific documentation
+- **[MULTI_CLOUD_SUMMARY.md](./MULTI_CLOUD_SUMMARY.md)** - Multi-cloud architecture summary
 
 ## 📁 Structure
 
@@ -33,7 +64,7 @@ This configuration supports **AWS**, **Google Cloud Platform**, or **both** simu
 
 ### Prerequisites
 
-- [Terraform](https://www.terraform.io/downloads.html) >= 1.6.0
+- [Terraform](https://www.terraform.io/downloads.html) >= 1.10.0
 - Cloud provider CLI tools:
   - **AWS**: [AWS CLI](https://aws.amazon.com/cli/) (if using AWS)
   - **GCP**: [gcloud CLI](https://cloud.google.com/sdk/gcloud) (if using GCP)
