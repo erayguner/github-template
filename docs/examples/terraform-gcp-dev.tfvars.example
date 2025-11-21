@@ -7,8 +7,8 @@
 
 environment = "dev"
 gcp_project = "my-project-dev"
-gcp_region  = "us-west1"
-gcp_zone    = "us-west1-a"
+gcp_region  = "europe-west2"
+gcp_zone    = "europe-west2-a"
 
 # ============================================================================
 # Network Configuration
@@ -23,13 +23,13 @@ subnets = [
   {
     name          = "dev-subnet-1"
     ip_cidr_range = "10.0.1.0/24"
-    region        = "us-west1"
+    region        = "europe-west2"
     purpose       = "PRIVATE"
   },
   {
     name          = "dev-subnet-2"
     ip_cidr_range = "10.0.2.0/24"
-    region        = "us-west1"
+    region        = "europe-west2"
     purpose       = "PRIVATE"
   }
 ]
@@ -85,7 +85,7 @@ db_disk_type = "PD_SSD"
 db_availability_type = "ZONAL"  # Single zone for dev
 db_backup_enabled = true
 db_backup_start_time = "02:00"
-db_backup_location = "us"
+db_backup_location = "europe-west2"
 db_backup_retention = 1  # day
 
 # Database flags
@@ -104,13 +104,13 @@ db_flags = [
 buckets = [
   {
     name          = "my-project-dev-data"
-    location      = "US"
+    location      = "europe-west2"
     storage_class = "STANDARD"
     versioning    = true
   },
   {
     name          = "my-project-dev-logs"
-    location      = "US"
+    location      = "europe-west2"
     storage_class = "NEARLINE"  # Cheaper for logs
     versioning    = false
   }

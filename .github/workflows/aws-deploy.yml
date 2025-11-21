@@ -44,7 +44,7 @@ permissions:
 
 env:
   TERRAFORM_VERSION: '1.6.0'
-  AWS_REGION: 'us-east-1'  # Default region, can be overridden per environment
+  AWS_REGION: 'eu-west-2'  # Default region (standardised)
 
 jobs:
   # ============================================================================
@@ -143,16 +143,16 @@ jobs:
           # Set AWS region based on environment
           case $ENV in
             prod)
-              REGION="us-east-1"
+              REGION="eu-west-2"
               ;;
             staging)
-              REGION="us-west-2"
+              REGION="eu-west-2"
               ;;
             dev)
-              REGION="us-west-2"
+              REGION="eu-west-2"
               ;;
             *)
-              REGION="us-east-1"
+              REGION="eu-west-2"
               ;;
           esac
 
