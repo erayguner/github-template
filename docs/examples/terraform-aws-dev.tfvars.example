@@ -1,0 +1,234 @@
+# AWS Terraform Variables - Development Environment
+# Copy this file to terraform/aws/environments/dev.tfvars and customize
+
+# ============================================================================
+# General Configuration
+# ============================================================================
+
+environment = "dev"
+aws_region  = "us-west-2"
+project     = "my-project"
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+
+# VPC Settings
+vpc_cidr            = "10.0.0.0/16"
+availability_zones  = ["us-west-2a", "us-west-2b"]
+public_subnets      = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnets     = ["10.0.10.0/24", "10.0.11.0/24"]
+enable_nat_gateway  = true
+single_nat_gateway  = true  # Cost optimization for dev
+
+# DNS Settings
+enable_dns_hostnames = true
+enable_dns_support   = true
+
+# ============================================================================
+# Compute Configuration
+# ============================================================================
+
+# EC2 Instances
+instance_type        = "t3.micro"  # Free tier eligible
+key_name            = "dev-key"
+enable_monitoring   = false  # Disable detailed monitoring for dev
+
+# Auto Scaling
+min_size             = 1
+max_size             = 2
+desired_capacity     = 1
+health_check_type    = "EC2"
+health_check_grace_period = 300
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+
+# RDS
+db_engine           = "postgres"
+db_engine_version   = "14.7"
+db_instance_class   = "db.t3.micro"  # Free tier eligible
+db_allocated_storage = 20  # GB
+db_name             = "devdb"
+db_username         = "dbadmin"
+# Note: Password should be in AWS Secrets Manager
+db_backup_retention = 1  # Minimal for dev
+db_multi_az         = false  # Single AZ for dev
+
+# ============================================================================
+# Storage Configuration
+# ============================================================================
+
+# S3 Buckets
+create_s3_buckets = true
+s3_bucket_names = [
+  "my-project-dev-data",
+  "my-project-dev-logs",
+  "my-project-dev-backups"
+]
+enable_versioning = true
+enable_encryption = true
+lifecycle_rules = {
+  logs = {
+    enabled = true
+    expiration_days = 30
+  }
+  backups = {
+    enabled = true
+    transition_glacier_days = 7
+    expiration_days = 30
+  }
+}
+
+# ============================================================================
+# Application Configuration
+# ============================================================================
+
+# Lambda Functions
+lambda_runtime      = "python3.11"
+lambda_memory_size  = 128  # MB
+lambda_timeout      = 30   # seconds
+
+# ECS/Fargate
+ecs_task_cpu        = 256
+ecs_task_memory     = 512
+ecs_desired_count   = 1
+
+# API Gateway
+api_gateway_type    = "REST"  # or "HTTP" for simpler use cases
+enable_api_cache    = false   # Disable caching for dev
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+
+# Security Groups
+allowed_ssh_cidrs = [
+  "10.0.0.0/8",  # Internal only
+]
+
+allowed_http_cidrs = [
+  "0.0.0.0/0",  # Public for dev
+]
+
+# WAF
+enable_waf = false  # Optional for dev
+
+# Secrets Manager
+create_secrets = true
+secrets = {
+  db_password = "my-project/dev/db/password"
+  api_key     = "my-project/dev/api/key"
+}
+
+# ============================================================================
+# Monitoring & Logging
+# ============================================================================
+
+# CloudWatch
+create_log_groups = true
+log_retention_days = 7  # Short retention for dev
+enable_cloudwatch_alarms = false  # Minimal alarms for dev
+
+# CloudTrail
+enable_cloudtrail = true
+cloudtrail_log_retention = 30
+
+# ============================================================================
+# Backup & Disaster Recovery
+# ============================================================================
+
+# Backup
+enable_backup_plan = false  # Optional for dev
+backup_schedule = "cron(0 2 * * ? *)"  # Daily at 2 AM UTC
+
+# Snapshots
+enable_ebs_snapshots = false
+snapshot_retention_days = 7
+
+# ============================================================================
+# Cost Optimization
+# ============================================================================
+
+# Instance Scheduler (stop/start instances on schedule)
+enable_instance_scheduler = true
+instance_schedule = {
+  start_time = "08:00"  # 8 AM
+  stop_time  = "18:00"  # 6 PM
+  timezone   = "America/Los_Angeles"
+  days       = ["Mon", "Tue", "Wed", "Thu", "Fri"]  # Weekdays only
+}
+
+# Spot Instances (for non-critical workloads)
+use_spot_instances = true
+spot_max_price = "0.05"  # USD per hour
+
+# ============================================================================
+# Tags
+# ============================================================================
+
+common_tags = {
+  Environment = "dev"
+  Project     = "my-project"
+  ManagedBy   = "terraform"
+  CostCenter  = "engineering"
+  Owner       = "devops-team"
+  Compliance  = "none"
+}
+
+# Resource-specific tags
+instance_tags = {
+  Type = "application-server"
+  Tier = "web"
+}
+
+database_tags = {
+  Type = "database"
+  Tier = "data"
+}
+
+# ============================================================================
+# Feature Flags
+# ============================================================================
+
+# Enable/disable specific features
+features = {
+  enable_cdn           = false  # CloudFront
+  enable_elasticsearch = false  # Expensive for dev
+  enable_redis         = true   # Caching
+  enable_sqs           = true   # Message queues
+  enable_sns           = true   # Notifications
+  enable_kinesis       = false  # Streaming (expensive)
+}
+
+# ============================================================================
+# Development-Specific Settings
+# ============================================================================
+
+# Allow SSH from anywhere (dev only!)
+allow_ssh_from_internet = true
+
+# Enable debug logging
+enable_debug_logging = true
+
+# Disable deletion protection (for easy cleanup)
+deletion_protection = false
+
+# Allow HTTP (not just HTTPS) for testing
+allow_http = true
+
+# Relaxed CORS policy
+cors_allowed_origins = ["*"]
+
+# ============================================================================
+# Notes
+# ============================================================================
+
+# - This is a cost-optimized configuration for development
+# - Uses free tier eligible resources where possible
+# - Minimal redundancy (single AZ, single NAT gateway)
+# - Short retention periods for logs and backups
+# - Instance scheduler to save costs outside working hours
+# - Deletion protection disabled for easy cleanup
+# - DO NOT use these settings for production!

@@ -1,0 +1,380 @@
+# GCP Terraform Variables - Development Environment
+# Copy this file to terraform/gcp/environments/dev.tfvars and customize
+
+# ============================================================================
+# General Configuration
+# ============================================================================
+
+environment = "dev"
+gcp_project = "my-project-dev"
+gcp_region  = "us-west1"
+gcp_zone    = "us-west1-a"
+
+# ============================================================================
+# Network Configuration
+# ============================================================================
+
+# VPC Network
+network_name        = "dev-network"
+auto_create_subnets = false
+
+# Subnets
+subnets = [
+  {
+    name          = "dev-subnet-1"
+    ip_cidr_range = "10.0.1.0/24"
+    region        = "us-west1"
+    purpose       = "PRIVATE"
+  },
+  {
+    name          = "dev-subnet-2"
+    ip_cidr_range = "10.0.2.0/24"
+    region        = "us-west1"
+    purpose       = "PRIVATE"
+  }
+]
+
+# Cloud NAT
+enable_cloud_nat = true
+nat_ip_allocate_option = "AUTO_ONLY"
+
+# VPC Peering
+enable_vpc_peering = false
+
+# ============================================================================
+# Compute Configuration
+# ============================================================================
+
+# Compute Engine
+machine_type = "e2-micro"  # Always free tier
+boot_disk_size = 10  # GB
+boot_disk_type = "pd-standard"
+
+# Instance Groups
+enable_autoscaling = true
+min_replicas = 1
+max_replicas = 2
+target_cpu_utilization = 0.6
+
+# Preemptible VMs (cost savings for dev)
+use_preemptible = true
+
+# ============================================================================
+# Kubernetes (GKE) Configuration
+# ============================================================================
+
+# GKE Cluster
+enable_gke = false  # Can be expensive, enable if needed
+gke_node_count = 1
+gke_machine_type = "e2-small"
+gke_disk_size_gb = 10
+gke_preemptible = true
+
+# GKE Autopilot (alternative to standard GKE)
+use_gke_autopilot = false
+
+# ============================================================================
+# Database Configuration
+# ============================================================================
+
+# Cloud SQL
+db_tier = "db-f1-micro"  # Lowest tier
+db_version = "POSTGRES_14"
+db_disk_size = 10  # GB
+db_disk_type = "PD_SSD"
+db_availability_type = "ZONAL"  # Single zone for dev
+db_backup_enabled = true
+db_backup_start_time = "02:00"
+db_backup_location = "us"
+db_backup_retention = 1  # day
+
+# Database flags
+db_flags = [
+  {
+    name  = "max_connections"
+    value = "100"
+  }
+]
+
+# ============================================================================
+# Storage Configuration
+# ============================================================================
+
+# Cloud Storage Buckets
+buckets = [
+  {
+    name          = "my-project-dev-data"
+    location      = "US"
+    storage_class = "STANDARD"
+    versioning    = true
+  },
+  {
+    name          = "my-project-dev-logs"
+    location      = "US"
+    storage_class = "NEARLINE"  # Cheaper for logs
+    versioning    = false
+  }
+]
+
+# Lifecycle Rules
+lifecycle_rules = {
+  logs = {
+    age_days = 30
+    action   = "Delete"
+  }
+  data = {
+    age_days       = 90
+    storage_class  = "COLDLINE"
+  }
+}
+
+# ============================================================================
+# Application Configuration
+# ============================================================================
+
+# Cloud Functions
+cloud_function_runtime = "python311"
+cloud_function_memory = 128  # MB
+cloud_function_timeout = 60  # seconds
+cloud_function_min_instances = 0
+cloud_function_max_instances = 2
+
+# Cloud Run
+cloud_run_memory = "256Mi"
+cloud_run_cpu = "1"
+cloud_run_min_instances = 0
+cloud_run_max_instances = 2
+cloud_run_concurrency = 80
+
+# App Engine
+enable_app_engine = false
+app_engine_instance_class = "F1"  # Free tier
+
+# ============================================================================
+# Security Configuration
+# ============================================================================
+
+# Firewall Rules
+firewall_rules = [
+  {
+    name        = "allow-internal"
+    direction   = "INGRESS"
+    priority    = 1000
+    ranges      = ["10.0.0.0/8"]
+    allow = [
+      {
+        protocol = "tcp"
+        ports    = ["0-65535"]
+      }
+    ]
+  },
+  {
+    name        = "allow-http-https"
+    direction   = "INGRESS"
+    priority    = 1000
+    ranges      = ["0.0.0.0/0"]
+    allow = [
+      {
+        protocol = "tcp"
+        ports    = ["80", "443"]
+      }
+    ]
+  },
+  {
+    name        = "allow-ssh"
+    direction   = "INGRESS"
+    priority    = 1000
+    ranges      = ["35.235.240.0/20"]  # IAP range
+    allow = [
+      {
+        protocol = "tcp"
+        ports    = ["22"]
+      }
+    ]
+  }
+]
+
+# Cloud Armor (WAF)
+enable_cloud_armor = false  # Optional for dev
+
+# Secret Manager
+enable_secret_manager = true
+secrets = {
+  db_password = {
+    data = ""  # Will be set separately
+  }
+  api_key = {
+    data = ""
+  }
+}
+
+# ============================================================================
+# Monitoring & Logging
+# ============================================================================
+
+# Cloud Monitoring
+enable_monitoring = true
+notification_channels = []
+
+# Uptime Checks
+enable_uptime_checks = false  # Optional for dev
+
+# Logging
+log_retention_days = 7  # Short retention for dev
+enable_audit_logs = true
+
+# Alerting
+enable_alerting = false  # Minimal alerting for dev
+
+# ============================================================================
+# Backup & Disaster Recovery
+# ============================================================================
+
+# Snapshots
+enable_disk_snapshots = false
+snapshot_schedule = "0 2 * * *"  # Daily at 2 AM
+
+# Backup
+backup_retention_days = 7
+
+# ============================================================================
+# Cost Optimization
+# ============================================================================
+
+# Committed Use Discounts
+enable_committed_use = false  # Not cost-effective for dev
+
+# Preemptible/Spot VMs
+use_spot_vms = true  # Up to 91% discount
+
+# Instance Schedule (shutdown outside working hours)
+enable_instance_schedule = true
+instance_schedule = {
+  start_schedule = "0 8 * * 1-5"   # 8 AM weekdays
+  stop_schedule  = "0 18 * * 1-5"  # 6 PM weekdays
+  timezone       = "America/Los_Angeles"
+}
+
+# Recommendations
+enable_recommender = true  # Get cost optimization suggestions
+
+# ============================================================================
+# Labels
+# ============================================================================
+
+common_labels = {
+  environment = "dev"
+  project     = "my-project"
+  managed_by  = "terraform"
+  cost_center = "engineering"
+  owner       = "devops-team"
+}
+
+resource_labels = {
+  compute_instance = {
+    type = "application-server"
+    tier = "web"
+  }
+  database = {
+    type = "database"
+    tier = "data"
+  }
+}
+
+# ============================================================================
+# Service APIs to Enable
+# ============================================================================
+
+enable_apis = [
+  "compute.googleapis.com",
+  "cloudresourcemanager.googleapis.com",
+  "storage-api.googleapis.com",
+  "sqladmin.googleapis.com",
+  "cloudkms.googleapis.com",
+  "secretmanager.googleapis.com",
+  "cloudscheduler.googleapis.com",
+  "cloudfunctions.googleapis.com",
+  "run.googleapis.com",
+  "monitoring.googleapis.com",
+  "logging.googleapis.com",
+]
+
+# ============================================================================
+# IAM Configuration
+# ============================================================================
+
+# Service Accounts
+service_accounts = [
+  {
+    account_id   = "app-server"
+    display_name = "Application Server Service Account"
+    roles = [
+      "roles/storage.objectViewer",
+      "roles/cloudsql.client",
+    ]
+  },
+  {
+    account_id   = "cloud-function"
+    display_name = "Cloud Functions Service Account"
+    roles = [
+      "roles/storage.objectAdmin",
+      "roles/secretmanager.secretAccessor",
+    ]
+  }
+]
+
+# Workload Identity (for GKE)
+enable_workload_identity = false
+
+# ============================================================================
+# Feature Flags
+# ============================================================================
+
+features = {
+  enable_cdn             = false  # Cloud CDN
+  enable_memorystore     = false  # Redis (can be expensive)
+  enable_pubsub          = true   # Message queues
+  enable_cloud_scheduler = true   # Cron jobs
+  enable_cloud_tasks     = true   # Task queues
+  enable_firestore       = false  # NoSQL database
+  enable_bigquery        = false  # Analytics (can be expensive)
+}
+
+# ============================================================================
+# Development-Specific Settings
+# ============================================================================
+
+# Allow SSH via IAP
+allow_iap_ssh = true
+
+# Enable OS Login
+enable_os_login = true
+
+# Serial port access (for debugging)
+enable_serial_port = true
+
+# Deletion protection
+deletion_protection = false  # Allow easy cleanup in dev
+
+# Public IP assignment
+assign_public_ip = true
+
+# CORS Settings (relaxed for dev)
+cors_config = {
+  max_age_seconds  = 3600
+  methods          = ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+  origins          = ["*"]
+  response_headers = ["*"]
+}
+
+# ============================================================================
+# Notes
+# ============================================================================
+
+# - This is a cost-optimized configuration for development
+# - Uses free tier and spot instances where possible
+# - Single zone deployment for cost savings
+# - Short retention periods for logs and backups
+# - Instance scheduler to save costs outside working hours
+# - Deletion protection disabled for easy cleanup
+# - DO NOT use these settings for production!

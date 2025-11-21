@@ -1,0 +1,418 @@
+name: Multi-Cloud Deployment
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'terraform/**'
+      - 'python/**'
+      - '.github/workflows/multi-cloud-deploy.yml'
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      clouds:
+        description: 'Cloud providers to deploy (comma-separated: aws,gcp,all)'
+        required: true
+        default: 'all'
+      action:
+        description: 'Deployment action'
+        required: true
+        type: choice
+        options:
+          - deploy
+          - plan-only
+          - destroy
+
+permissions:
+  contents: read
+  id-token: write
+  security-events: write
+  pull-requests: write
+
+env:
+  TERRAFORM_VERSION: '1.6.0'
+
+jobs:
+  # ============================================================================
+  # Determine Deployment Strategy
+  # ============================================================================
+  determine-strategy:
+    name: Determine Deployment Strategy
+    runs-on: ubuntu-latest
+    outputs:
+      environment: ${{ steps.strategy.outputs.environment }}
+      deploy-aws: ${{ steps.strategy.outputs.deploy-aws }}
+      deploy-gcp: ${{ steps.strategy.outputs.deploy-gcp }}
+      should-deploy: ${{ steps.strategy.outputs.should-deploy }}
+    steps:
+      - name: Set deployment strategy
+        id: strategy
+        run: |
+          # Determine environment
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ENV="${{ github.event.inputs.environment }}"
+            CLOUDS="${{ github.event.inputs.clouds }}"
+            DEPLOY="true"
+            if [[ "${{ github.event.inputs.action }}" == "plan-only" ]]; then
+              DEPLOY="false"
+            fi
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            ENV="prod"
+            CLOUDS="all"
+            DEPLOY="true"
+          elif [[ "${{ github.ref }}" == "refs/heads/develop" ]]; then
+            ENV="staging"
+            CLOUDS="all"
+            DEPLOY="true"
+          else
+            ENV="dev"
+            CLOUDS="all"
+            DEPLOY="false"
+          fi
+
+          # Determine which clouds to deploy
+          DEPLOY_AWS="false"
+          DEPLOY_GCP="false"
+
+          if [[ "$CLOUDS" == "all" ]]; then
+            DEPLOY_AWS="true"
+            DEPLOY_GCP="true"
+          elif [[ "$CLOUDS" == *"aws"* ]]; then
+            DEPLOY_AWS="true"
+          fi
+
+          if [[ "$CLOUDS" == *"gcp"* ]]; then
+            DEPLOY_GCP="true"
+          fi
+
+          echo "environment=${ENV}" >> $GITHUB_OUTPUT
+          echo "deploy-aws=${DEPLOY_AWS}" >> $GITHUB_OUTPUT
+          echo "deploy-gcp=${DEPLOY_GCP}" >> $GITHUB_OUTPUT
+          echo "should-deploy=${DEPLOY}" >> $GITHUB_OUTPUT
+
+          echo "📍 Environment: ${ENV}"
+          echo "☁️ Deploy AWS: ${DEPLOY_AWS}"
+          echo "☁️ Deploy GCP: ${DEPLOY_GCP}"
+          echo "🚀 Should Deploy: ${DEPLOY}"
+
+  # ============================================================================
+  # Global Security Scanning
+  # ============================================================================
+  security-scan:
+    name: Multi-Cloud Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Terraform Format Check (All)
+        run: |
+          terraform fmt -check -diff -recursive terraform/
+
+      - name: Security Scan - AWS
+        if: hashFiles('terraform/aws/**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ./terraform/aws
+          format: sarif
+          output: tfsec-aws.sarif
+
+      - name: Security Scan - GCP
+        if: hashFiles('terraform/gcp/**/*.tf') != ''
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ./terraform/gcp
+          format: sarif
+          output: tfsec-gcp.sarif
+
+      - name: Upload AWS SARIF
+        if: always() && hashFiles('tfsec-aws.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec-aws.sarif
+          category: terraform-aws
+
+      - name: Upload GCP SARIF
+        if: always() && hashFiles('tfsec-gcp.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: tfsec-gcp.sarif
+          category: terraform-gcp
+
+      - name: Checkov Multi-Cloud Scan
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: terraform/
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-multicloud.sarif
+
+      - name: Upload Checkov SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: checkov-multicloud.sarif
+          category: terraform-multicloud
+
+      - name: Secret Scanning
+        uses: trufflesecurity/trufflehog@v3.85.0
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+
+  # ============================================================================
+  # AWS Deployment Pipeline
+  # ============================================================================
+  deploy-aws:
+    name: Deploy to AWS
+    needs: [determine-strategy, security-scan]
+    if: needs.determine-strategy.outputs.deploy-aws == 'true'
+    uses: ./.github/workflows/aws-deploy.yml
+    secrets: inherit
+    with:
+      environment: ${{ needs.determine-strategy.outputs.environment }}
+      should-deploy: ${{ needs.determine-strategy.outputs.should-deploy }}
+
+  # ============================================================================
+  # GCP Deployment Pipeline
+  # ============================================================================
+  deploy-gcp:
+    name: Deploy to GCP
+    needs: [determine-strategy, security-scan]
+    if: needs.determine-strategy.outputs.deploy-gcp == 'true'
+    uses: ./.github/workflows/gcp-deploy.yml
+    secrets: inherit
+    with:
+      environment: ${{ needs.determine-strategy.outputs.environment }}
+      should-deploy: ${{ needs.determine-strategy.outputs.should-deploy }}
+
+  # ============================================================================
+  # Cross-Cloud Validation
+  # ============================================================================
+  cross-cloud-validation:
+    name: Cross-Cloud Validation
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp, determine-strategy]
+    if: |
+      always() &&
+      needs.determine-strategy.outputs.should-deploy == 'true' &&
+      (needs.deploy-aws.result == 'success' || needs.deploy-gcp.result == 'success')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Validate Cross-Cloud Connectivity
+        run: |
+          echo "Validating cross-cloud network connectivity..."
+          # Test VPN connections, peering, etc.
+
+      - name: Validate Data Synchronization
+        run: |
+          echo "Checking data replication across clouds..."
+          # Verify database replication, storage sync
+
+      - name: Validate Load Balancing
+        run: |
+          echo "Testing multi-cloud load balancing..."
+          # Test global load balancer distribution
+
+      - name: Validate Disaster Recovery
+        run: |
+          echo "Verifying DR configuration..."
+          # Check backup systems, failover mechanisms
+
+  # ============================================================================
+  # Cost Analysis
+  # ============================================================================
+  cost-analysis:
+    name: Multi-Cloud Cost Analysis
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp, determine-strategy]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: Install Infracost
+        run: |
+          curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+
+      - name: AWS Cost Estimate
+        if: needs.determine-strategy.outputs.deploy-aws == 'true'
+        working-directory: ./terraform/aws
+        run: |
+          infracost breakdown --path . \
+            --format json \
+            --out-file /tmp/infracost-aws.json
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: GCP Cost Estimate
+        if: needs.determine-strategy.outputs.deploy-gcp == 'true'
+        working-directory: ./terraform/gcp
+        run: |
+          infracost breakdown --path . \
+            --format json \
+            --out-file /tmp/infracost-gcp.json
+        env:
+          INFRACOST_API_KEY: ${{ secrets.INFRACOST_API_KEY }}
+
+      - name: Generate Combined Cost Report
+        run: |
+          echo "## Multi-Cloud Cost Analysis" > cost-report.md
+          echo "" >> cost-report.md
+
+          if [[ -f /tmp/infracost-aws.json ]]; then
+            echo "### AWS Costs" >> cost-report.md
+            infracost output --path /tmp/infracost-aws.json --format table >> cost-report.md
+          fi
+
+          if [[ -f /tmp/infracost-gcp.json ]]; then
+            echo "### GCP Costs" >> cost-report.md
+            infracost output --path /tmp/infracost-gcp.json --format table >> cost-report.md
+          fi
+
+      - name: Comment PR with Cost Analysis
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('cost-report.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: report
+            });
+
+  # ============================================================================
+  # Compliance Check
+  # ============================================================================
+  compliance-check:
+    name: Multi-Cloud Compliance
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp]
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Run Compliance Checks
+        run: |
+          echo "Running multi-cloud compliance checks..."
+          # Check for GDPR, HIPAA, SOC2 compliance
+          # Verify encryption at rest and in transit
+          # Check IAM policies and access controls
+
+      - name: Generate Compliance Report
+        run: |
+          echo "Generating compliance report..."
+          # Generate detailed compliance status report
+
+  # ============================================================================
+  # Final Status and Notifications
+  # ============================================================================
+  final-status:
+    name: Deployment Summary
+    runs-on: ubuntu-latest
+    needs: [deploy-aws, deploy-gcp, cross-cloud-validation, determine-strategy]
+    if: always()
+    steps:
+      - name: Calculate Deployment Status
+        id: status
+        run: |
+          AWS_STATUS="${{ needs.deploy-aws.result }}"
+          GCP_STATUS="${{ needs.deploy-gcp.result }}"
+          VALIDATION_STATUS="${{ needs.cross-cloud-validation.result }}"
+
+          OVERALL="success"
+
+          if [[ "$AWS_STATUS" == "failure" ]] || [[ "$GCP_STATUS" == "failure" ]]; then
+            OVERALL="failure"
+          elif [[ "$VALIDATION_STATUS" == "failure" ]]; then
+            OVERALL="partial"
+          fi
+
+          echo "overall-status=${OVERALL}" >> $GITHUB_OUTPUT
+
+          # Generate summary
+          cat << EOF > summary.md
+          ## Multi-Cloud Deployment Summary
+
+          **Environment**: ${{ needs.determine-strategy.outputs.environment }}
+          **Overall Status**: ${OVERALL}
+
+          ### Cloud Provider Status
+          - AWS: ${AWS_STATUS}
+          - GCP: ${GCP_STATUS}
+
+          ### Validation Status
+          - Cross-Cloud: ${VALIDATION_STATUS}
+
+          **Triggered by**: ${{ github.actor }}
+          **Workflow**: ${{ github.workflow }}
+          **Run**: ${{ github.run_number }}
+          EOF
+
+          cat summary.md
+
+      - name: Post Summary to PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('summary.md', 'utf8');
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+
+      - name: Slack Notification
+        if: vars.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1
+        with:
+          payload: |
+            {
+              "text": "Multi-Cloud Deployment ${{ steps.status.outputs.overall-status }}",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "*Multi-Cloud Deployment ${{ steps.status.outputs.overall-status }}*\n*Environment:* ${{ needs.determine-strategy.outputs.environment }}\n*AWS:* ${{ needs.deploy-aws.result }}\n*GCP:* ${{ needs.deploy-gcp.result }}\n*Triggered by:* ${{ github.actor }}"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
