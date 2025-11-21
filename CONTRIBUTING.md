@@ -23,7 +23,7 @@ Thank you for your interest in contributing! This document provides guidelines f
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/github-template.git
+   git clone https://github.com/erayguner/github-template.git
    cd github-template
    ```
 

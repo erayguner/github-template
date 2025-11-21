@@ -1,17 +1,20 @@
 <div align="center">
 
-# 🚀 Multi-Language Repository Template
+# 🚀 GCP Terraform CI/CD Template
 
 <p align="center">
-  <strong>Production-ready GitHub template with automated CI/CD, security scanning, and modern development workflows</strong>
+  <strong>Production-ready GitHub template for GCP infrastructure with automated CI/CD, security scanning, and one-command setup</strong>
 </p>
 
 <p align="center">
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml">
-    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/ci.yml/badge.svg" alt="CI/CD Pipeline"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/ci.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI/CD Pipeline"/>
   </a>
-  <a href="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml">
-    <img src="https://github.com/YOUR_USERNAME/YOUR_REPO/actions/workflows/security.yml/badge.svg" alt="Security Analysis"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/security.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/security.yml/badge.svg?branch=main" alt="Security Analysis"/>
+  </a>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml/badge.svg?branch=main" alt="MegaLinter"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
@@ -19,18 +22,20 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python 3.11+"/>
+  <img src="https://img.shields.io/badge/Google_Cloud-4285F4?logo=google-cloud&logoColor=white" alt="Google Cloud Platform"/>
   <img src="https://img.shields.io/badge/Terraform-1.10+-623CE4?logo=terraform&logoColor=white" alt="Terraform 1.10+"/>
+  <img src="https://img.shields.io/badge/Python-3.11+-3776AB?logo=python&logoColor=white" alt="Python 3.11+"/>
   <img src="https://img.shields.io/badge/UV-Package_Manager-DE5FE9?logo=astral&logoColor=white" alt="UV"/>
   <img src="https://img.shields.io/badge/Ruff-Linter-D7FF64?logo=ruff&logoColor=black" alt="Ruff"/>
-  <img src="https://img.shields.io/badge/CodeQL-Security-2B9348?logo=github&logoColor=white" alt="CodeQL"/>
+  <img src="https://img.shields.io/badge/MegaLinter-Enabled-brightgreen?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0iI2ZmZiIgZD0iTTEyIDJMMyA3djZjMCA1LjU1IDMuODQgMTAuNzQgOSAxMiA1LjE2LTEuMjYgOS02LjQ1IDktMTJWN2wtOS01em0tMiAxNWwtNS01IDEuNDEtMS40MUwxMCAxNC4xN2w3LjU5LTcuNTlMMTkgOGwtOSA5eiIvPjwvc3ZnPg==" alt="MegaLinter"/>
+  <img src="https://img.shields.io/badge/Security-tfsec_checkov-2B9348?logo=github&logoColor=white" alt="Security Scanning"/>
 </p>
 
 <p align="center">
-  <a href="#-quick-start">Quick Start</a> •
+  <a href="#-gcp-quick-start-5-minutes">GCP Quick Start</a> •
+  <a href="#-quick-start">Full Setup</a> •
   <a href="#-key-features">Features</a> •
-  <a href="#-supported-technologies">Technologies</a> •
-  <a href="#license">License</a>
+  <a href="#-supported-technologies">Technologies</a>
 </p>
 
 </div>
@@ -39,14 +44,38 @@
 
 ## 📖 Overview
 
-Production-ready GitHub template for Terraform and Python projects with automated CI/CD, security scanning, and modern development workflows.
+Production-ready GitHub template for Terraform and Python projects with automated CI/CD, security scanning, and modern development workflows. **Perfect for starting new GCP infrastructure projects** with a single command!
+
+## 🎯 GCP Quick Start (5 Minutes)
+
+Get your GCP Terraform CI/CD pipeline running with just your project ID:
+
+```bash
+# One command to set up everything!
+./scripts/setup-gcp-project.sh YOUR_GCP_PROJECT_ID
+```
+
+This automatically configures:
+- ✅ GCP project with required APIs
+- ✅ Service account with proper IAM roles
+- ✅ GCS buckets for Terraform state, logs, and artifacts
+- ✅ Terraform backend configuration
+- ✅ GitHub Actions CI/CD pipeline
+
+**📚 Detailed Guides:**
+- [GCP Quick Start (5 min)](docs/QUICK-START-GCP.md) - Get started immediately
+- [Full GCP Setup Guide](docs/GCP-SETUP.md) - Comprehensive documentation
+- [Cloud Build Integration](docs/CLOUD-BUILD.md) - Alternative to GitHub Actions
 
 ## ✨ Key Features
 
-- 🛡️ **Security-First**: CodeQL, GitLeaks, Dependabot
-- ⚡ **Fast Tooling**: UV package manager, Ruff linting  
+- 🛡️ **Security-First**: CodeQL, tfsec, checkov, GitLeaks, Dependabot
+- ⚡ **Fast Tooling**: UV package manager, Ruff linting, MegaLinter
 - 🌩️ **Multi-Cloud**: AWS, GCP, or hybrid support
 - 🔄 **Zero-Config**: Automatic project detection
+- 📦 **Automated Setup**: One-command GCP project initialization
+- 🔒 **Production-Ready**: Security scanning, state management, and best practices
+- 🔍 **Comprehensive Linting**: MegaLinter runs 70+ linters for code quality
 
 ## 📁 Repository Structure
 
@@ -85,7 +114,7 @@ Before you begin, ensure you have the following installed:
 #### 1. Create from Template
 Use this repository as a GitHub template or clone it:
 ```bash
-git clone https://github.com/YOUR_USERNAME/github-template.git
+git clone https://github.com/erayguner/github-template.git
 cd github-template
 ```
 
@@ -158,10 +187,16 @@ pre-commit run --all-files
 
 ### Next Steps
 
+#### For GCP Users:
+- 🚀 **Start Here**: [GCP Quick Start Guide](docs/QUICK-START-GCP.md) - 5-minute setup
+- 📖 **Full Guide**: [GCP Setup Documentation](docs/GCP-SETUP.md) - Comprehensive setup
+- 🔧 **Advanced**: [Cloud Build Integration](docs/CLOUD-BUILD.md) - GCP-native CI/CD
+- 🌐 **Multi-Cloud**: [Multi-Cloud Setup](docs/multi-cloud.md) - AWS + GCP
+
+#### General Documentation:
 - 📖 Read [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines
 - 🔒 Review [SECURITY.md](SECURITY.md) for security policies
 - 📚 Check [docs/](docs/) for detailed documentation
-- 🏗️ See [DEPLOYMENT.md](DEPLOYMENT.md) for deployment instructions
 
 ## License
 
