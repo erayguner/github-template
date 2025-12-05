@@ -7,7 +7,7 @@
 # =============================================================================
 # Stage 1: Build stage with UV for fast dependency installation
 # =============================================================================
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 
 # Install UV package manager
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
@@ -34,7 +34,7 @@ COPY python/src ./src
 # =============================================================================
 # Stage 2: Production runtime image
 # =============================================================================
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 
 # Security: Run as non-root user
 RUN groupadd --gid 1000 appgroup && \
