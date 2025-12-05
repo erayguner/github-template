@@ -93,6 +93,9 @@ jobs:
           sarif_upload: true
           scm_token: ${{ secrets.GITHUB_TOKEN }}
           verbose: true
+          # Skip false positive: VPC flow logs ARE enabled via aws_flow_log resource
+          # Terrascan doesn't detect cross-resource relationships
+          skip_rules: AC_AWS_0369
 
       - name: Upload SARIF
         if: always()

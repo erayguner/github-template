@@ -14,9 +14,14 @@ rego_subdir = ""
 # Severity levels to fail on (high, medium, low)
 severity = "high"
 
-# Skip specific rules (none - all security checks are enabled)
+# Skip specific rules (false positives only - document each)
 # Security groups now use security group references instead of CIDR blocks
-skip-rules = []
+skip-rules = [
+    # AC_AWS_0369: False positive - VPC flow logs ARE enabled via aws_flow_log.vpc_flow_logs
+    # resource which is correctly connected to aws_vpc.main[0].id. Terrascan doesn't detect
+    # cross-resource relationships. See terraform/aws.tf lines 27-38.
+    "AC_AWS_0369",
+]
 
 # Notification configuration
 [notifications]
