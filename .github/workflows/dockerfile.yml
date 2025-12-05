@@ -1,0 +1,61 @@
+# Dockerfile Linting Workflow
+# Runs hadolint for Dockerfile best practices
+
+name: Dockerfile
+
+on:
+  push:
+    branches: ["*"]
+    paths:
+      - "Dockerfile*"
+      - ".hadolint.yaml"
+      - ".github/workflows/dockerfile.yml"
+  pull_request:
+    branches: ["*"]
+    paths:
+      - "Dockerfile*"
+      - ".hadolint.yaml"
+      - ".github/workflows/dockerfile.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  hadolint:
+    name: Hadolint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run Hadolint
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Dockerfile
+          format: sarif
+          output-file: hadolint.sarif
+          failure-threshold: warning
+
+      - name: Upload SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: hadolint.sarif
+          category: hadolint
+        continue-on-error: true
+
+  trivy-dockerfile:
+    name: Trivy Dockerfile Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Run Trivy on Dockerfile
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: Dockerfile
+          format: table
+          severity: CRITICAL,HIGH,MEDIUM
+        continue-on-error: true

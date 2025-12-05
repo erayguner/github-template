@@ -198,28 +198,6 @@ Some hooks are skipped in CI (pre-commit.ci) because they require local tooling:
 - `terraform_tfsec` - Requires tfsec
 - `gitleaks` - Requires gitleaks binary
 
-## MegaLinter Configuration
-
-**File:** `.mega-linter.yml`
-
-### Disabled Linters
-
-| Linter | Reason |
-|--------|--------|
-| `SPELL_LYCHEE` | Broken template URLs in documentation |
-| `SPELL_CSPELL` | Too many false positives |
-| `YAML_V8R` | GitHub Actions schema issues |
-| `MARKDOWN_MARKDOWNLINT` | Conflicts with documentation style |
-| `REPOSITORY_GRYPE/TRIVY/KICS` | Duplicate security scanning |
-
-### Terraform-specific Settings
-
-```yaml
-TERRAFORM_TFLINT_ARGUMENTS: "--config .tflint.hcl"
-TERRAFORM_TERRASCAN_ARGUMENTS: "--skip-rules AC_AWS_0321,AC_AWS_0322"
-TERRAFORM_TERRASCAN_DIRECTORY: terraform
-```
-
 ## Conventions for Contributors
 
 ### Terraform
@@ -295,7 +273,7 @@ key: simple-value
 
 ### Terrascan scanning wrong directories
 
-Ensure `.terrascan.toml` or MegaLinter config specifies the correct directory:
-```yaml
-TERRAFORM_TERRASCAN_DIRECTORY: terraform
+Ensure `.terrascan.toml` specifies the correct directory, or run Terrascan with explicit path:
+```bash
+terrascan scan -d terraform/
 ```
