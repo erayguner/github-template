@@ -53,32 +53,8 @@ jobs:
             sbom.cyclonedx.json
           retention-days: 30
 
-  trivy-sbom:
-    name: Trivy SBOM Vulnerability Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v5
-
-      # Generate SBOM with Trivy and scan in one step
-      # This avoids compatibility issues between Syft and Trivy SBOM formats
-      - name: Generate and scan SBOM with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          scan-type: fs
-          scan-ref: .
-          format: sarif
-          output: trivy-sbom.sarif
-          severity: CRITICAL,HIGH
-          scanners: vuln
-
-      - name: Upload Trivy SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-sbom.sarif
-          category: trivy-sbom
-        continue-on-error: true
+  # Note: Trivy vulnerability scanning is handled by security.yml (trivy-fs job)
+  # This workflow focuses on SBOM generation and language-specific dependency auditing
 
   python-deps:
     name: Python Dependency Audit
