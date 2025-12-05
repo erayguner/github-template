@@ -144,32 +144,3 @@ resource "google_service_account_iam_member" "cicd_workload_identity" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github[0].name}/attribute.repository/${var.github_org}/${var.github_repo}"
 }
-
-# =============================================================================
-# Outputs for Service Accounts
-# =============================================================================
-
-output "app_service_account_email" {
-  description = "Email of the application service account"
-  value       = var.enable_gcp ? google_service_account.app[0].email : null
-}
-
-output "cicd_service_account_email" {
-  description = "Email of the CI/CD service account"
-  value       = var.enable_gcp ? google_service_account.cicd[0].email : null
-}
-
-output "terraform_service_account_email" {
-  description = "Email of the Terraform service account"
-  value       = var.enable_gcp ? google_service_account.terraform[0].email : null
-}
-
-output "workload_identity_provider" {
-  description = "Workload Identity Provider resource name for GitHub Actions"
-  value       = var.enable_gcp ? google_iam_workload_identity_pool_provider.github[0].name : null
-}
-
-output "workload_identity_pool" {
-  description = "Workload Identity Pool resource name"
-  value       = var.enable_gcp ? google_iam_workload_identity_pool.github[0].name : null
-}

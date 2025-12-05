@@ -28,8 +28,10 @@ rule "terraform_deprecated_index" {
 }
 
 # Disallow variables, data sources, and locals that are declared but never used
+# Disabled: Template repositories intentionally include unused example variables
+# that users can customize for their specific use cases
 rule "terraform_unused_declarations" {
-  enabled = true
+  enabled = false
 }
 
 # Disallow // comments in favor of #
