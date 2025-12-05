@@ -249,8 +249,8 @@ terraform.rc
 # Security and Secrets
 # ===========================
 
-# Pre-commit secrets baseline
-.secrets.baseline
+# Pre-commit secrets baseline (keep .secrets.baseline tracked for template)
+# .secrets.baseline
 
 # Environment files
 .env*

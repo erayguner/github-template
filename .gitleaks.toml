@@ -1,0 +1,79 @@
+# Gitleaks Configuration
+# Documentation: https://github.com/gitleaks/gitleaks
+
+title = "Gitleaks Configuration for GCP Template"
+
+# Extends the default gitleaks configuration
+[extend]
+useDefault = true
+
+# Allowed patterns (false positives to ignore)
+[allowlist]
+description = "Allowed patterns for this repository"
+
+# Paths to ignore
+paths = [
+    '''.secrets.baseline''',
+    '''\.terraform/.*''',
+    '''node_modules/.*''',
+    '''\.venv/.*''',
+    '''\.git/.*''',
+    '''megalinter-reports/.*''',
+    '''\.terraform\.lock\.hcl''',
+    '''package-lock\.json''',
+    '''uv\.lock''',
+]
+
+# Regex patterns to ignore
+regexes = [
+    # Ignore example/placeholder values
+    '''YOUR_.*''',
+    '''my-.*-project.*''',
+    '''example\.com''',
+    '''placeholder''',
+    '''changeme''',
+    '''CHANGEME''',
+    # Ignore Terraform state bucket patterns
+    '''.*-terraform-state''',
+    # Ignore common test patterns
+    '''test.*secret''',
+    '''fake.*key''',
+    '''dummy.*password''',
+]
+
+# Stop words to ignore
+stopwords = [
+    "example",
+    "placeholder",
+    "changeme",
+    "your_",
+    "my_",
+]
+
+# Custom rules (extend default rules)
+[[rules]]
+id = "gcp-service-account-key"
+description = "Detects GCP service account key files"
+regex = '''"type"\s*:\s*"service_account"'''
+tags = ["gcp", "service-account"]
+
+[[rules]]
+id = "gcp-api-key"
+description = "Detects GCP API keys"
+regex = '''AIza[0-9A-Za-z\-_]{35}'''
+tags = ["gcp", "api-key"]
+
+[[rules]]
+id = "terraform-cloud-token"
+description = "Detects Terraform Cloud/Enterprise tokens"
+regex = '''[a-zA-Z0-9]{14}\.atlasv1\.[a-zA-Z0-9\-_=]{60,70}'''
+tags = ["terraform"]
+
+# Files to always scan (even if in allowlist paths)
+# [files]
+# include = []
+
+# Entropy detection settings
+[rules.entropy]
+enabled = true
+threshold = 4.5
