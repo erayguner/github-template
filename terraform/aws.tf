@@ -231,17 +231,29 @@ resource "aws_default_security_group" "default" {
   }
 }
 
-# CKV2_AWS_5: Security group must be attached to a resource
+# CKV2_AWS_5: Security groups must be attached to a resource
 # Example network interface to demonstrate security group attachment
-resource "aws_network_interface" "example" {
+resource "aws_network_interface" "web_example" {
   count = var.enable_aws ? 1 : 0
 
   subnet_id       = aws_subnet.public[0].id
   security_groups = [aws_security_group.web[0].id]
-  description     = "Example ENI demonstrating security group attachment"
+  description     = "Example ENI for web security group"
 
   tags = {
-    Name = "${var.project_name}-example-eni"
+    Name = "${var.project_name}-web-eni"
+  }
+}
+
+resource "aws_network_interface" "alb_example" {
+  count = var.enable_aws ? 1 : 0
+
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.internal_alb[0].id]
+  description     = "Example ENI for internal ALB security group"
+
+  tags = {
+    Name = "${var.project_name}-alb-eni"
   }
 }
 
