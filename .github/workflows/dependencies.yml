@@ -106,7 +106,7 @@ jobs:
         working-directory: python
         run: |
           if [ -f pip-audit.json ]; then
-            cat pip-audit.json | python -m json.tool
+            python -m json.tool < pip-audit.json
           fi
 
   grype:

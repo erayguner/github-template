@@ -122,7 +122,7 @@ jobs:
         if: always()
         run: |
           if [ -f bandit-report.json ]; then
-            cat bandit-report.json | python -m json.tool
+            python -m json.tool < bandit-report.json
           fi
 
   codeql:

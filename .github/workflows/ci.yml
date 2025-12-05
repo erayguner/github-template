@@ -29,10 +29,12 @@ jobs:
       - name: Detect file changes
         id: changes
         run: |
-          echo "has_python=$([[ -n $(find python -type f -name '*.py' 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_terraform=$([[ -n $(find . -type f -name '*.tf' 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_shell=$([[ -n $(find . -type f \( -name '*.sh' -o -name '*.bash' \) 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
-          echo "has_yaml=$([[ -n $(find . -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null) ]] && echo 'true' || echo 'false')" >> $GITHUB_OUTPUT
+          {
+            echo "has_python=$([[ -n $(find python -type f -name '*.py' 2>/dev/null) ]] && echo 'true' || echo 'false')"
+            echo "has_terraform=$([[ -n $(find . -type f -name '*.tf' 2>/dev/null) ]] && echo 'true' || echo 'false')"
+            echo "has_shell=$([[ -n $(find . -type f \( -name '*.sh' -o -name '*.bash' \) 2>/dev/null) ]] && echo 'true' || echo 'false')"
+            echo "has_yaml=$([[ -n $(find . -type f \( -name '*.yml' -o -name '*.yaml' \) 2>/dev/null) ]] && echo 'true' || echo 'false')"
+          } >> "$GITHUB_OUTPUT"
 
   # ============================================================================
   # STAGE 2: Python Pipeline
@@ -123,7 +125,7 @@ jobs:
   python-tests:
     name: 🧪 Python Tests (pytest)
     runs-on: ubuntu-latest
-    needs: [python-lint, python-type-check]
+    needs: [detect-changes, python-lint, python-type-check]
     if: needs.detect-changes.outputs.has_python == 'true'
     steps:
       - name: Checkout code
@@ -171,7 +173,7 @@ jobs:
   terraform-validate:
     name: ✅ Terraform Validate
     runs-on: ubuntu-latest
-    needs: terraform-format
+    needs: [detect-changes, terraform-format]
     if: needs.detect-changes.outputs.has_terraform == 'true'
     steps:
       - name: Checkout code
@@ -214,7 +216,7 @@ jobs:
           ls -la ./terraform/
           if [ -f "./terraform/tfsec.sarif" ]; then
             echo "✅ SARIF file found"
-            cat ./terraform/tfsec.sarif | head -20
+            head -20 ./terraform/tfsec.sarif
           else
             echo "❌ SARIF file not found"
             exit 1

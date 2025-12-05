@@ -168,20 +168,20 @@ jobs:
         id: branch
         run: |
           if [ "${{ steps.pick.outputs.same_repo }}" = "true" ]; then
-            echo "branch=${{ steps.pick.outputs.head_ref }}" >> $GITHUB_OUTPUT
-            echo "mode=direct" >> $GITHUB_OUTPUT
+            echo "branch=${{ steps.pick.outputs.head_ref }}" >> "$GITHUB_OUTPUT"
+            echo "mode=direct" >> "$GITHUB_OUTPUT"
             echo "🔧 Will push fixes directly to: ${{ steps.pick.outputs.head_ref }}"
           else
             # Create unique branch name with timestamp to avoid collisions
             TIMESTAMP=$(date +%s)
             FIX_BRANCH="claude-auto-fix-ci-${{ steps.pick.outputs.head_ref }}-${{ github.run_id }}-${TIMESTAMP}"
-            
-            echo "Creating fix branch: $FIX_BRANCH"
-            git checkout -b "$FIX_BRANCH"
-            
-            echo "branch=$FIX_BRANCH" >> $GITHUB_OUTPUT
-            echo "mode=branch" >> $GITHUB_OUTPUT
-            echo "🔧 Created fix branch: $FIX_BRANCH"
+
+            echo "Creating fix branch: ${FIX_BRANCH}"
+            git checkout -b "${FIX_BRANCH}"
+
+            echo "branch=${FIX_BRANCH}" >> "$GITHUB_OUTPUT"
+            echo "mode=branch" >> "$GITHUB_OUTPUT"
+            echo "🔧 Created fix branch: ${FIX_BRANCH}"
           fi
 
       - name: Collect failed job details
@@ -358,7 +358,6 @@ jobs:
             3. Manual fixes for remaining issues
             4. Final check: `ruff check . --no-fix` shows ZERO errors
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          acknowledge-dangerously-skip-permissions-responsibility: "true"
           claude_args: "--max-turns 15 --model claude-sonnet-4-20250514 --dangerously-skip-permissions"
 
       - name: Verify Claude changes and run tests
@@ -509,18 +508,19 @@ jobs:
           fi
           
           # Push with retry logic
-          for i in $(seq 1 ${{ env.MAX_RETRY_ATTEMPTS }}); do
+          MAX_ATTEMPTS="${{ env.MAX_RETRY_ATTEMPTS }}"
+          for i in $(seq 1 "${MAX_ATTEMPTS}"); do
             if git push -u origin "${{ steps.branch.outputs.branch }}"; then
-              echo "✅ Successfully pushed changes (attempt $i)"
+              echo "✅ Successfully pushed changes (attempt ${i})"
               break
             else
-              echo "⚠️  Push failed (attempt $i/${{ env.MAX_RETRY_ATTEMPTS }})"
-              if [ $i -lt ${{ env.MAX_RETRY_ATTEMPTS }} ]; then
+              echo "⚠️  Push failed (attempt ${i}/${MAX_ATTEMPTS})"
+              if [ "${i}" -lt "${MAX_ATTEMPTS}" ]; then
                 echo "Retrying in 5 seconds..."
                 sleep 5
                 git pull --rebase origin "${{ steps.branch.outputs.branch }}" || true
               else
-                echo "::error::Failed to push after ${{ env.MAX_RETRY_ATTEMPTS }} attempts"
+                echo "::error::Failed to push after ${MAX_ATTEMPTS} attempts"
                 exit 1
               fi
             fi

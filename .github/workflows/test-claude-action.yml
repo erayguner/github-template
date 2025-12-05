@@ -41,8 +41,8 @@ jobs:
         run: |
           TIMESTAMP=$(date +%s)
           TEST_BRANCH="test-claude-fix-${TIMESTAMP}"
-          git checkout -b "$TEST_BRANCH"
-          echo "TEST_BRANCH=$TEST_BRANCH" >> $GITHUB_ENV
+          git checkout -b "${TEST_BRANCH}"
+          echo "TEST_BRANCH=${TEST_BRANCH}" >> "$GITHUB_ENV"
 
       - name: Verify API key configuration
         run: |

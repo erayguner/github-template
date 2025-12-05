@@ -145,7 +145,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -229,14 +229,18 @@ jobs:
             fi
           fi
           
-          echo "issues_detected=$ISSUES_FOUND" >> $GITHUB_OUTPUT
+          echo "issues_detected=${ISSUES_FOUND}" >> "$GITHUB_OUTPUT"
 
       - name: Test Claude integration
-        if: secrets.ANTHROPIC_API_KEY != '' && (github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'claude-integration')
+        if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'claude-integration'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          echo "## 🤖 Testing Claude Integration" >> $GITHUB_STEP_SUMMARY
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "⚠️ ANTHROPIC_API_KEY not set, skipping Claude integration test"
+            exit 0
+          fi
+          echo "## 🤖 Testing Claude Integration" >> "$GITHUB_STEP_SUMMARY"
           
           # Install Anthropic SDK
           pip install anthropic

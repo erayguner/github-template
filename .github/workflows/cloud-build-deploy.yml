@@ -74,9 +74,9 @@ jobs:
         id: set-env
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
+            echo "environment=${{ github.event.inputs.environment }}" >> "$GITHUB_OUTPUT"
           else
-            echo "environment=dev" >> $GITHUB_OUTPUT
+            echo "environment=dev" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Check deployment conditions
@@ -85,11 +85,11 @@ jobs:
           ENV="${{ steps.set-env.outputs.environment }}"
 
           # Production requires explicit approval
-          if [ "$ENV" == "prod" ]; then
+          if [ "${ENV}" == "prod" ]; then
             echo "::warning::Production deployment requires manual approval"
-            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "should_deploy=false" >> "$GITHUB_OUTPUT"
           else
-            echo "should_deploy=true" >> $GITHUB_OUTPUT
+            echo "should_deploy=true" >> "$GITHUB_OUTPUT"
           fi
 
   # ============================================================================
@@ -151,40 +151,40 @@ jobs:
         id: build
         run: |
           ENV="${{ needs.pre-deploy-check.outputs.environment }}"
-          echo "::notice::Starting Cloud Build for environment: $ENV"
+          echo "::notice::Starting Cloud Build for environment: ${ENV}"
 
           # Submit build to Cloud Build
           BUILD_ID=$(gcloud builds submit \
             --config=cloudbuild.yaml \
-            --substitutions="_ENVIRONMENT=$ENV,_REGION=${{ env.GCP_REGION }}" \
+            --substitutions="_ENVIRONMENT=${ENV},_REGION=${{ env.GCP_REGION }}" \
             --async \
             --format='value(id)' \
             .)
 
-          echo "build_id=$BUILD_ID" >> $GITHUB_OUTPUT
-          echo "::notice::Cloud Build started: $BUILD_ID"
+          echo "build_id=${BUILD_ID}" >> "$GITHUB_OUTPUT"
+          echo "::notice::Cloud Build started: ${BUILD_ID}"
 
           # Stream build logs
-          gcloud builds log $BUILD_ID --stream || true
+          gcloud builds log "${BUILD_ID}" --stream || true
 
       - name: Wait for build completion
         run: |
           BUILD_ID="${{ steps.build.outputs.build_id }}"
 
-          echo "Waiting for build $BUILD_ID to complete..."
-          gcloud builds describe $BUILD_ID --format='value(status)'
+          echo "Waiting for build ${BUILD_ID} to complete..."
+          gcloud builds describe "${BUILD_ID}" --format='value(status)'
 
           # Poll for completion (max 30 minutes)
-          for i in {1..60}; do
-            STATUS=$(gcloud builds describe $BUILD_ID --format='value(status)')
-            echo "Build status: $STATUS"
+          for _ in {1..60}; do
+            STATUS=$(gcloud builds describe "${BUILD_ID}" --format='value(status)')
+            echo "Build status: ${STATUS}"
 
-            if [ "$STATUS" == "SUCCESS" ]; then
+            if [ "${STATUS}" == "SUCCESS" ]; then
               echo "::notice::Build completed successfully!"
               exit 0
-            elif [ "$STATUS" == "FAILURE" ] || [ "$STATUS" == "CANCELLED" ] || [ "$STATUS" == "TIMEOUT" ]; then
-              echo "::error::Build failed with status: $STATUS"
-              gcloud builds log $BUILD_ID || true
+            elif [ "${STATUS}" == "FAILURE" ] || [ "${STATUS}" == "CANCELLED" ] || [ "${STATUS}" == "TIMEOUT" ]; then
+              echo "::error::Build failed with status: ${STATUS}"
+              gcloud builds log "${BUILD_ID}" || true
               exit 1
             fi
 
