@@ -90,11 +90,6 @@ repos:
         args:
           - --hook-config=--retry-once-with-cleanup=true
 
-      # Documentation generation (optional - uncomment if using terraform-docs)
-      # - id: terraform_docs
-      #   args:
-      #     - --args=--config=.terraform-docs.yml
-
       # TFLint - Advanced Terraform linting
       - id: terraform_tflint
         args:
@@ -147,15 +142,6 @@ repos:
         args: [-shellcheck=]
 
   # =============================================================================
-  # Markdown Linting (optional - enable if you want strict markdown)
-  # =============================================================================
-  # - repo: https://github.com/igorshubovych/markdownlint-cli
-  #   rev: v0.42.0
-  #   hooks:
-  #     - id: markdownlint
-  #       args: [--fix, --disable, MD013, MD033, MD041]
-
-  # =============================================================================
   # Commit Message Validation
   # =============================================================================
   - repo: https://github.com/commitizen-tools/commitizen
@@ -190,8 +176,8 @@ ci:
 
     for more information, see https://pre-commit.ci
   autofix_prs: true
-  autoupdate_branch: ''
-  autoupdate_commit_msg: '[pre-commit.ci] pre-commit autoupdate'
+  autoupdate_branch: ""
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit autoupdate"
   autoupdate_schedule: weekly
   skip: [terraform_validate, terraform_tflint, terraform_checkov, terraform_tfsec, gitleaks]
   submodules: false

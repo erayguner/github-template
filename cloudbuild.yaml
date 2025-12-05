@@ -10,21 +10,21 @@
 #   _SERVICE_NAME: Cloud Run service name
 
 substitutions:
-  _ENVIRONMENT: "dev"
-  _REGION: "us-central1"
-  _SERVICE_NAME: "app"
-  _ARTIFACT_REGISTRY: "docker-repo"
+  _ENVIRONMENT: dev
+  _REGION: us-central1
+  _SERVICE_NAME: app
+  _ARTIFACT_REGISTRY: docker-repo
 
 options:
   logging: CLOUD_LOGGING_ONLY
-  machineType: "E2_HIGHCPU_8"
-  substitution_option: "ALLOW_LOOSE"
+  machineType: E2_HIGHCPU_8
+  substitution_option: ALLOW_LOOSE
 
 tags:
-  - "terraform"
-  - "python"
-  - "ci-cd"
-  - "${_ENVIRONMENT}"
+  - terraform
+  - python
+  - ci-cd
+  - ${_ENVIRONMENT}
 
 # Build steps execute sequentially unless waitFor is specified
 steps:
@@ -33,11 +33,11 @@ steps:
   # ============================================================================
 
   # Step 1.1: Terraform Format Check
-  - id: "terraform-fmt"
-    name: "hashicorp/terraform:1.10"
-    entrypoint: "sh"
+  - id: terraform-fmt
+    name: hashicorp/terraform:1.10
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Terraform Format Check ==="
         cd terraform
@@ -45,48 +45,48 @@ steps:
     waitFor: ["-"]
 
   # Step 1.2: Terraform Validation
-  - id: "terraform-validate"
-    name: "hashicorp/terraform:1.10"
-    entrypoint: "sh"
+  - id: terraform-validate
+    name: hashicorp/terraform:1.10
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Terraform Validation ==="
         cd terraform
         terraform init -backend=false -input=false
         terraform validate
-    waitFor: ["terraform-fmt"]
+    waitFor: [terraform-fmt]
 
   # Step 1.3: Terraform Security Scan (tfsec)
-  - id: "terraform-security"
-    name: "aquasec/tfsec:latest"
+  - id: terraform-security
+    name: aquasec/tfsec:latest
     args:
-      - "./terraform"
-      - "--format"
-      - "json"
-      - "--soft-fail"
+      - ./terraform
+      - --format
+      - json
+      - --soft-fail
     waitFor: ["-"]
 
   # Step 1.4: Infrastructure Security Scan (checkov)
-  - id: "checkov-scan"
-    name: "bridgecrew/checkov:latest"
-    entrypoint: "checkov"
+  - id: checkov-scan
+    name: bridgecrew/checkov:latest
+    entrypoint: checkov
     args:
-      - "-d"
-      - "./terraform"
-      - "--framework"
-      - "terraform"
-      - "--compact"
-      - "--quiet"
-      - "--soft-fail"
+      - -d
+      - ./terraform
+      - --framework
+      - terraform
+      - --compact
+      - --quiet
+      - --soft-fail
     waitFor: ["-"]
 
   # Step 1.5: Python Linting (Ruff)
-  - id: "python-lint"
-    name: "python:3.13-slim"
-    entrypoint: "sh"
+  - id: python-lint
+    name: python:3.13-slim
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Python Linting ==="
         pip install --quiet ruff
@@ -96,11 +96,11 @@ steps:
     waitFor: ["-"]
 
   # Step 1.6: Python Security Scan (Bandit)
-  - id: "python-security"
-    name: "python:3.13-slim"
-    entrypoint: "sh"
+  - id: python-security
+    name: python:3.13-slim
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Python Security Scan ==="
         pip install --quiet bandit
@@ -109,11 +109,11 @@ steps:
     waitFor: ["-"]
 
   # Step 1.7: Secret Scanning (gitleaks)
-  - id: "secret-scan"
-    name: "zricethezav/gitleaks:latest"
-    entrypoint: "sh"
+  - id: secret-scan
+    name: zricethezav/gitleaks:latest
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Secret Scanning ==="
         gitleaks detect --source . --verbose --no-git || true
@@ -124,29 +124,29 @@ steps:
   # ============================================================================
 
   # Step 2.1: Python Unit Tests
-  - id: "python-tests"
-    name: "python:3.13-slim"
-    entrypoint: "sh"
+  - id: python-tests
+    name: python:3.13-slim
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Python Tests ==="
         pip install --quiet pytest pytest-cov
         cd python
         pip install -e . || true
         pytest tests/ -v --cov=src --cov-report=term-missing || true
-    waitFor: ["python-lint"]
+    waitFor: [python-lint]
 
   # ============================================================================
   # STAGE 3: Build Docker Image (if Dockerfile exists)
   # ============================================================================
 
   # Step 3.1: Build Container Image
-  - id: "docker-build"
-    name: "gcr.io/cloud-builders/docker"
-    entrypoint: "sh"
+  - id: docker-build
+    name: gcr.io/cloud-builders/docker
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         if [ -f "Dockerfile" ]; then
           echo "=== Building Docker Image ==="
@@ -155,14 +155,14 @@ steps:
         else
           echo "No Dockerfile found, skipping build"
         fi
-    waitFor: ["python-tests", "terraform-validate"]
+    waitFor: [python-tests, terraform-validate]
 
   # Step 3.2: Push Container Image to Artifact Registry
-  - id: "docker-push"
-    name: "gcr.io/cloud-builders/docker"
-    entrypoint: "sh"
+  - id: docker-push
+    name: gcr.io/cloud-builders/docker
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         if [ -f "Dockerfile" ]; then
           echo "=== Pushing Docker Image ==="
@@ -171,18 +171,18 @@ steps:
         else
           echo "No Dockerfile found, skipping push"
         fi
-    waitFor: ["docker-build"]
+    waitFor: [docker-build]
 
   # ============================================================================
   # STAGE 4: Terraform Plan (for non-main branches)
   # ============================================================================
 
   # Step 4.1: Terraform Plan
-  - id: "terraform-plan"
-    name: "hashicorp/terraform:1.10"
-    entrypoint: "sh"
+  - id: terraform-plan
+    name: hashicorp/terraform:1.10
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=== Terraform Plan ==="
         cd terraform
@@ -201,7 +201,7 @@ steps:
           -var="gcp_region=${_REGION}" \
           -out=tfplan \
           -input=false
-    waitFor: ["terraform-validate", "terraform-security", "checkov-scan"]
+    waitFor: [terraform-validate, terraform-security, checkov-scan]
 
   # ============================================================================
   # STAGE 5: Terraform Apply (main branch only - manual trigger recommended)
@@ -209,11 +209,11 @@ steps:
 
   # Step 5.1: Terraform Apply (requires manual approval in production)
   # Uncomment this step when ready for automated deployments
-  # - id: "terraform-apply"
-  #   name: "hashicorp/terraform:1.10"
-  #   entrypoint: "sh"
+  # - id: terraform-apply
+  #   name: hashicorp/terraform:1.10
+  #   entrypoint: sh
   #   args:
-  #     - "-c"
+  #     - -c
   #     - |
   #       if [ "${BRANCH_NAME}" = "main" ] && [ "${_ENVIRONMENT}" != "prod" ]; then
   #         echo "=== Terraform Apply (${_ENVIRONMENT}) ==="
@@ -222,18 +222,18 @@ steps:
   #       else
   #         echo "Skipping auto-apply for branch ${BRANCH_NAME} or prod environment"
   #       fi
-  #   waitFor: ["terraform-plan"]
+  #   waitFor: [terraform-plan]
 
   # ============================================================================
   # STAGE 6: Deploy to Cloud Run (if applicable)
   # ============================================================================
 
   # Step 6.1: Deploy to Cloud Run
-  - id: "deploy-cloud-run"
-    name: "gcr.io/cloud-builders/gcloud"
-    entrypoint: "sh"
+  - id: deploy-cloud-run
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         if [ -f "Dockerfile" ] && [ "${_ENVIRONMENT}" != "prod" ]; then
           echo "=== Deploying to Cloud Run (${_ENVIRONMENT}) ==="
@@ -251,18 +251,18 @@ steps:
         else
           echo "Skipping Cloud Run deployment"
         fi
-    waitFor: ["docker-push", "terraform-plan"]
+    waitFor: [docker-push, terraform-plan]
 
   # ============================================================================
   # STAGE 7: Notifications & Cleanup
   # ============================================================================
 
   # Step 7.1: Build Summary
-  - id: "build-summary"
-    name: "gcr.io/cloud-builders/gcloud"
-    entrypoint: "sh"
+  - id: build-summary
+    name: gcr.io/cloud-builders/gcloud
+    entrypoint: sh
     args:
-      - "-c"
+      - -c
       - |
         echo "=============================================="
         echo "          BUILD SUMMARY                       "
@@ -275,16 +275,16 @@ steps:
         echo "=============================================="
         echo "Build completed successfully!"
     waitFor:
-      - "terraform-plan"
-      - "python-tests"
-      - "secret-scan"
+      - terraform-plan
+      - python-tests
+      - secret-scan
 
 # Artifacts to save after build
 artifacts:
   objects:
-    location: "gs://${PROJECT_ID}-build-artifacts/${BUILD_ID}"
+    location: gs://${PROJECT_ID}-build-artifacts/${BUILD_ID}
     paths:
-      - "terraform/tfplan"
+      - terraform/tfplan
 
 # Build timeout (default is 10 minutes)
-timeout: "1800s"
+timeout: 1800s

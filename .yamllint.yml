@@ -4,10 +4,10 @@
 extends: default
 
 yaml-files:
-  - '*.yaml'
-  - '*.yml'
-  - '.yamllint'
-  - '.yamllint.yml'
+  - "*.yaml"
+  - "*.yml"
+  - .yamllint
+  - .yamllint.yml
 
 ignore: |
   .venv/
@@ -124,6 +124,6 @@ rules:
 
   # Truthy values
   truthy:
-    allowed-values: ['true', 'false', 'yes', 'no', 'on', 'off']
+    allowed-values: [true, false, "yes", "no", "on", "off"]
     check-keys: false
     level: warning

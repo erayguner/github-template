@@ -1,0 +1,35 @@
+# Terrascan Configuration
+# Documentation: https://runterrascan.io/docs/usage/config_options/
+
+[terrascan]
+# Only scan the terraform directory (avoid scanning docs, python, etc.)
+scan-rules = ["terraform"]
+
+# Policy configuration
+[policy]
+# Use AWS policies
+path = []
+rego_subdir = ""
+
+# Severity levels to fail on (high, medium, low)
+severity = "high"
+
+# Skip specific rules that are intentionally configured differently in this template
+# These are documented in docs/linting-notes.md
+skip-rules = [
+    # Security group rules - template demonstrates restricted access to VPC CIDR
+    # In production, users should further restrict these based on their requirements
+    "AC_AWS_0321",  # networkPort80ExposedToprivate - HTTP restricted to VPC CIDR (intentional for template)
+    "AC_AWS_0322",  # networkPort443ExposedToprivate - HTTPS restricted to VPC CIDR (intentional for template)
+]
+
+# Notification configuration
+[notifications]
+# Webhook URL for notifications (optional)
+webhook-url = ""
+webhook-token = ""
+
+# Output configuration
+[output]
+# Output format: json, yaml, xml, junit-xml, sarif, github-sarif
+format = "json"

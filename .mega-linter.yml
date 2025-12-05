@@ -39,6 +39,10 @@ DISABLE_LINTERS:
 TERRAFORM_TFLINT_ARGUMENTS: "--config .tflint.hcl"
 TERRAFORM_TERRAFORM_FMT_ARGUMENTS: "-recursive"
 TERRAFORM_CHECKOV_ARGUMENTS: "--compact --quiet"
+# Terrascan: skip security group rules that are intentionally template examples
+# Users should customize these rules for production use
+TERRAFORM_TERRASCAN_ARGUMENTS: "--skip-rules AC_AWS_0321,AC_AWS_0322"
+TERRAFORM_TERRASCAN_DIRECTORY: terraform
 
 # Python linters
 PYTHON_RUFF_CONFIG_FILE: pyproject.toml

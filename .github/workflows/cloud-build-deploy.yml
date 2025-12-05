@@ -42,7 +42,7 @@ concurrency:
 
 env:
   GCP_REGION: us-central1
-  TERRAFORM_VERSION: "1.10.0"
+  TERRAFORM_VERSION: 1.10.0
 
 permissions:
   contents: read
@@ -101,9 +101,6 @@ jobs:
     needs: pre-deploy-check
     if: needs.pre-deploy-check.outputs.should_deploy == 'true'
 
-    outputs:
-      authenticated: ${{ steps.auth.outputs.authenticated }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -115,8 +112,6 @@ jobs:
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-          # Alternative: Use service account key (not recommended for production)
-          # credentials_json: ${{ secrets.GCP_SA_KEY }}
 
       - name: Set up Cloud SDK
         uses: google-github-actions/setup-gcloud@v2
@@ -127,7 +122,6 @@ jobs:
         run: |
           echo "::notice::Successfully authenticated to GCP"
           gcloud config list
-          echo "authenticated=true" >> $GITHUB_OUTPUT
 
   # ============================================================================
   # Trigger Cloud Build

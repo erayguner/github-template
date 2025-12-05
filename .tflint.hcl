@@ -5,8 +5,9 @@
 #   tflint --init
 
 config {
-  # Enable all available modules
-  module = true
+  # Enable module inspection (call_module_type replaces deprecated 'module' in v0.54.0+)
+  # Options: "all", "local", "none"
+  call_module_type = "local"
 
   # Force mode - returns non-zero exit code on any issue
   force = false
