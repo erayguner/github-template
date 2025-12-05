@@ -13,7 +13,7 @@ terraform {
     # Google Cloud Provider (optional - enabled via var.enable_gcp)
     google = {
       source  = "hashicorp/google"
-      version = "~> 6.0"
+      version = "~> 7.12"
     }
 
     # Utility providers (always available)
