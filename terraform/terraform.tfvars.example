@@ -124,3 +124,66 @@ tags = {
 # aws_region     = "us-west-2"
 # gcp_project_id = "my-staging-project"
 # gcp_region     = "us-central1"
+
+# =============================================================================
+# GITHUB INTEGRATION (for Workload Identity Federation)
+# =============================================================================
+
+# Required for GitHub Actions to authenticate with GCP using OIDC
+# This enables keyless authentication (no service account keys needed)
+
+github_org  = "your-github-username"  # GitHub username or organization
+github_repo = "your-repo-name"        # Repository name (without org prefix)
+
+# =============================================================================
+# CLOUD RUN CONFIGURATION (optional)
+# =============================================================================
+
+# Configure Cloud Run service resources
+cloud_run_memory        = "512Mi"   # Memory allocation (256Mi, 512Mi, 1Gi, 2Gi, 4Gi, 8Gi)
+cloud_run_cpu           = "1"       # CPU allocation (1, 2, 4, or 8)
+cloud_run_min_instances = 0         # Min instances (0 = scale to zero)
+cloud_run_max_instances = 10        # Max instances for auto-scaling
+
+# Alternative Cloud Run configurations:
+# - For low-traffic apps:
+#   cloud_run_memory = "256Mi"
+#   cloud_run_cpu = "1"
+#   cloud_run_min_instances = 0
+#   cloud_run_max_instances = 3
+#
+# - For high-traffic apps:
+#   cloud_run_memory = "2Gi"
+#   cloud_run_cpu = "2"
+#   cloud_run_min_instances = 2
+#   cloud_run_max_instances = 100
+
+# =============================================================================
+# COMPLETE GCP-ONLY EXAMPLE
+# =============================================================================
+
+# Uncomment this block for a complete GCP deployment:
+#
+# project_name            = "my-gcp-app"
+# environment             = "dev"
+# cloud_provider          = "gcp"
+# enable_aws              = false
+# enable_gcp              = true
+# gcp_project_id          = "my-gcp-project-123456"
+# gcp_region              = "us-central1"
+# gcp_zone                = "us-central1-a"
+# vpc_cidr                = "10.0.0.0/16"
+# github_org              = "mycompany"
+# github_repo             = "my-gcp-app"
+# cloud_run_memory        = "512Mi"
+# cloud_run_cpu           = "1"
+# cloud_run_min_instances = 0
+# cloud_run_max_instances = 10
+# enable_monitoring       = true
+# backup_retention_days   = 7
+# tags = {
+#   Owner       = "Platform Team"
+#   CostCenter  = "Engineering"
+#   Purpose     = "Development"
+#   Terraform   = "true"
+# }

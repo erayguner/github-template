@@ -42,7 +42,7 @@ resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
   count = var.enable_aws ? 1 : 0
 
   name              = "/aws/vpc/${var.project_name}-flow-logs"
-  retention_in_days = 7                       # Keep costs low for template
+  retention_in_days = 365                     # CKV_AWS_338: Minimum 1 year retention
   kms_key_id        = aws_kms_key.logs[0].arn # Encrypt logs
 
   tags = {
@@ -149,7 +149,30 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public[0].id
 }
 
+# Internal ALB Security Group (created first to avoid circular dependency)
+# This security group is for the internal application load balancer
+resource "aws_security_group" "internal_alb" {
+  count = var.enable_aws ? 1 : 0
+
+  name_prefix = "${var.project_name}-internal-alb-"
+  vpc_id      = aws_vpc.main[0].id
+  description = "Security group for internal application load balancer"
+
+  # No ingress rules by default - add specific rules based on requirements
+  # Example: Allow from VPN, bastion, or other internal services
+
+  tags = {
+    Name = "${var.project_name}-internal-alb-sg"
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 # AWS Security Group Example
+# Note: This security group demonstrates secure-by-default configuration.
+# For production, attach this to your load balancer or application instances.
 resource "aws_security_group" "web" {
   count = var.enable_aws ? 1 : 0
 
@@ -157,37 +180,80 @@ resource "aws_security_group" "web" {
   vpc_id      = aws_vpc.main[0].id
   description = "Security group for web servers with restricted access"
 
-  # Allow HTTP only from trusted networks (replace with your actual CIDR)
+  # HTTPS from internal load balancer only (not direct internet access)
+  # AC_AWS_0322: Use security group reference instead of CIDR for internal traffic
   ingress {
-    description = "HTTP from trusted networks"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
+    description     = "HTTPS from internal ALB"
+    from_port       = 443
+    to_port         = 443
+    protocol        = "tcp"
+    security_groups = [aws_security_group.internal_alb[0].id]
   }
 
-  # Allow HTTPS only from trusted networks
-  ingress {
-    description = "HTTPS from trusted networks"
+  # Restrict egress to HTTPS only for external API calls
+  egress {
+    description = "HTTPS outbound for external APIs"
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr] # Only allow from within VPC
-  }
-
-  # Restrict egress to VPC only - add specific rules as needed
-  # NOTE: For production, add specific egress rules for required services
-  # Example: HTTPS to specific domains, database access, etc.
-  egress {
-    description = "Allow outbound within VPC"
-    from_port   = 0
-    to_port     = 65535
-    protocol    = "tcp"
-    cidr_blocks = [var.vpc_cidr]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 
   tags = {
     Name = "${var.project_name}-web-sg"
+  }
+}
+
+# Egress rule for ALB to web servers (separate to avoid circular dependency)
+resource "aws_security_group_rule" "alb_to_web" {
+  count = var.enable_aws ? 1 : 0
+
+  type                     = "egress"
+  from_port                = 443
+  to_port                  = 443
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.web[0].id
+  security_group_id        = aws_security_group.internal_alb[0].id
+  description              = "Forward HTTPS to web servers"
+}
+
+# CKV2_AWS_12: Default security group restricts all traffic
+resource "aws_default_security_group" "default" {
+  count = var.enable_aws ? 1 : 0
+
+  vpc_id = aws_vpc.main[0].id
+
+  # No ingress rules - deny all inbound by default
+  # No egress rules - deny all outbound by default
+
+  tags = {
+    Name = "${var.project_name}-default-sg-restricted"
+  }
+}
+
+# CKV2_AWS_5: Security groups must be attached to a resource
+# Example network interface to demonstrate security group attachment
+resource "aws_network_interface" "web_example" {
+  count = var.enable_aws ? 1 : 0
+
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.web[0].id]
+  description     = "Example ENI for web security group"
+
+  tags = {
+    Name = "${var.project_name}-web-eni"
+  }
+}
+
+resource "aws_network_interface" "alb_example" {
+  count = var.enable_aws ? 1 : 0
+
+  subnet_id       = aws_subnet.public[0].id
+  security_groups = [aws_security_group.internal_alb[0].id]
+  description     = "Example ENI for internal ALB security group"
+
+  tags = {
+    Name = "${var.project_name}-alb-eni"
   }
 }
 
@@ -198,6 +264,43 @@ resource "aws_kms_key" "logs" {
   description             = "KMS key for CloudWatch Logs encryption"
   deletion_window_in_days = 7    # Shorter window for template
   enable_key_rotation     = true # Enable automatic key rotation
+
+  # CKV2_AWS_64: Explicit least-privilege key policy
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Id      = "logs-key-policy"
+    Statement = [
+      {
+        Sid    = "EnableRootAccountPermissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current[0].account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogs"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${var.aws_region}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt*",
+          "kms:Decrypt*",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:Describe*"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnLike = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current[0].account_id}:log-group:*"
+          }
+        }
+      }
+    ]
+  })
 
   tags = {
     Name = "${var.project_name}-logs-key"

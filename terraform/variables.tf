@@ -138,3 +138,71 @@ variable "backup_retention_days" {
     error_message = "Backup retention days must be between 1 and 365."
   }
 }
+
+# GitHub Integration Variables (for Workload Identity Federation)
+variable "github_org" {
+  description = "GitHub organization or username"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9][a-zA-Z0-9-]*$", var.github_org)) || var.github_org == ""
+    error_message = "GitHub org must contain only alphanumeric characters and hyphens."
+  }
+}
+
+variable "github_repo" {
+  description = "GitHub repository name"
+  type        = string
+  default     = ""
+
+  validation {
+    condition     = can(regex("^[a-zA-Z0-9._-]+$", var.github_repo)) || var.github_repo == ""
+    error_message = "GitHub repo must contain only valid repository characters."
+  }
+}
+
+# Cloud Run Configuration
+variable "cloud_run_memory" {
+  description = "Memory allocation for Cloud Run service"
+  type        = string
+  default     = "512Mi"
+
+  validation {
+    condition     = can(regex("^[0-9]+(Mi|Gi)$", var.cloud_run_memory))
+    error_message = "Cloud Run memory must be specified in Mi or Gi (e.g., 512Mi, 1Gi)."
+  }
+}
+
+variable "cloud_run_cpu" {
+  description = "CPU allocation for Cloud Run service"
+  type        = string
+  default     = "1"
+
+  validation {
+    condition     = contains(["1", "2", "4", "8"], var.cloud_run_cpu)
+    error_message = "Cloud Run CPU must be 1, 2, 4, or 8."
+  }
+}
+
+variable "cloud_run_min_instances" {
+  description = "Minimum number of Cloud Run instances"
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.cloud_run_min_instances >= 0 && var.cloud_run_min_instances <= 100
+    error_message = "Min instances must be between 0 and 100."
+  }
+}
+
+variable "cloud_run_max_instances" {
+  description = "Maximum number of Cloud Run instances"
+  type        = number
+  default     = 10
+
+  validation {
+    condition     = var.cloud_run_max_instances >= 1 && var.cloud_run_max_instances <= 1000
+    error_message = "Max instances must be between 1 and 1000."
+  }
+}

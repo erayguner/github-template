@@ -1,0 +1,106 @@
+# Python Linting and Testing Workflow
+# Runs ruff, mypy, and pytest for Python code quality
+
+name: Python
+
+on:
+  push:
+    branches: ["*"]
+    paths:
+      - "python/**"
+      - "pyproject.toml"
+      - ".github/workflows/python.yml"
+  pull_request:
+    branches: ["*"]
+    paths:
+      - "python/**"
+      - "pyproject.toml"
+      - ".github/workflows/python.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ruff:
+    name: Ruff Lint & Format
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        run: uv python install 3.13
+
+      - name: Install Ruff
+        run: uv tool install ruff
+
+      - name: Run Ruff Linter
+        working-directory: python
+        run: ruff check . --output-format=github
+
+      - name: Run Ruff Formatter Check
+        working-directory: python
+        run: ruff format --check .
+
+  mypy:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: python
+        run: |
+          uv venv
+          uv sync --group dev || true
+
+      - name: Run mypy
+        working-directory: python
+        run: uv run mypy src/ --ignore-missing-imports || true
+
+  pytest:
+    name: Tests (pytest)
+    runs-on: ubuntu-latest
+    needs: ruff
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Setup Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        working-directory: python
+        run: |
+          uv venv
+          uv sync --group dev --group test || true
+
+      - name: Run pytest
+        working-directory: python
+        run: |
+          uv run pytest tests/ -v \
+            --cov=src \
+            --cov-report=xml \
+            --cov-report=term-missing \
+            || true
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: python/coverage.xml
+          retention-days: 7

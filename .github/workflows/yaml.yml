@@ -1,0 +1,72 @@
+# YAML Validation Workflow
+# Runs yamllint and prettier for YAML/JSON files
+
+name: YAML
+
+on:
+  push:
+    branches: ["*"]
+    paths:
+      - "**.yml"
+      - "**.yaml"
+      - "**.json"
+      - ".yamllint.yml"
+      - ".prettierrc*"
+      - ".github/workflows/yaml.yml"
+  pull_request:
+    branches: ["*"]
+    paths:
+      - "**.yml"
+      - "**.yaml"
+      - "**.json"
+      - ".yamllint.yml"
+      - ".prettierrc*"
+      - ".github/workflows/yaml.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  yamllint:
+    name: YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install yamllint
+        run: pip install yamllint
+
+      - name: Run yamllint
+        run: yamllint -c .yamllint.yml .
+
+  prettier:
+    name: Prettier Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Prettier
+        run: npm install -g prettier
+
+      - name: Check YAML formatting
+        run: |
+          prettier --check "**/*.yml" "**/*.yaml" \
+            --ignore-path .gitignore \
+            --ignore-unknown \
+            || echo "::warning::Some YAML files are not formatted with Prettier"
+        continue-on-error: true
+
+      - name: Check JSON formatting
+        run: |
+          prettier --check "**/*.json" \
+            --ignore-path .gitignore \
+            --ignore-unknown \
+            || echo "::warning::Some JSON files are not formatted with Prettier"
+        continue-on-error: true

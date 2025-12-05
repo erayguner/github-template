@@ -32,7 +32,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       test-files-created: ${{ steps.setup.outputs.files_created }}
-      
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,60 +45,60 @@ jobs:
         if: github.event.inputs.create_issues == 'true'
         run: |
           echo "Creating test files with intentional issues..."
-          
+
           # Create Python test file with various issues
           mkdir -p test-fixes
-          
+
           cat > test-fixes/test_python_issues.py << 'EOF'
           # Test file with intentional Python issues
           import os
           import sys
           import unused_module  # Import error
-          
+
           # Syntax error - missing colon
           def broken_function()
               return "missing colon"
-          
+
           # Formatting issues
           def poorly_formatted(x,y,z):
               result=x+y*z
               return result
-          
+
           # Logic error
           def multiply_wrong(a, b):
               return a + b  # Should be multiply, not add
-          
+
           # Security issue - eval usage
           def dangerous_function(user_input):
               return eval(user_input)
-          
+
           # Test that will fail
           def test_multiply():
               assert multiply_wrong(3, 4) == 12  # Will fail
           EOF
-          
+
           # Create JavaScript file with issues
           cat > test-fixes/test_js_issues.js << 'EOF'
           // JavaScript file with intentional issues
-          
+
           // Syntax error
           function brokenFunc() {
               return "missing semicolon"  // Missing semicolon
               var unreachable = "code";
           }
-          
+
           // ESLint issues
           var unused_var = "not used";
           function poorFormatting(x,y){
           return x+y
           }
-          
+
           // Type error (if TypeScript)
           function typeIssue(num) {
               return num.toUpperCase(); // String method on number
           }
           EOF
-          
+
           # Create YAML file with issues
           cat > test-fixes/test_yaml_issues.yml << 'EOF'
           # YAML file with intentional issues
@@ -113,20 +113,20 @@ jobs:
                 - name: Test
                   run: echo "test"
           EOF
-          
-          echo "files_created=true" >> $GITHUB_OUTPUT
+
+          echo "files_created=true" >> "$GITHUB_OUTPUT"
           echo "✅ Test files created successfully"
-          
+
           # List created files
           echo "Created test files:"
-          find test-fixes -name "*.py" -o -name "*.js" -o -name "*.yml" | sort
+          find test-fixes -type f \( -name "*.py" -o -name "*.js" -o -name "*.yml" \) | sort
 
       - name: Commit test files
         if: steps.setup.outputs.files_created == 'true'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "Test Auto-Fix Bot"
-          
+
           git add test-fixes/
           git commit -m "test: add files with intentional issues for auto-fix testing" || echo "No changes to commit"
           git push origin HEAD:${{ github.ref_name }}
@@ -136,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup-test
     if: always()
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -158,12 +158,12 @@ jobs:
         run: |
           # Python tools
           pip install flake8 black isort mypy pytest bandit
-          
+
           # JavaScript tools (if package.json exists)
           if [ -f "package.json" ]; then
             npm install -g eslint prettier @typescript-eslint/parser @typescript-eslint/eslint-plugin
           fi
-          
+
           # YAML tools
           pip install yamllint
 
@@ -171,76 +171,80 @@ jobs:
         id: lint-test
         continue-on-error: true
         run: |
-          echo "## 🔍 Testing Linter Detection" >> $GITHUB_STEP_SUMMARY
-          
+          echo "## 🔍 Testing Linter Detection" >> "$GITHUB_STEP_SUMMARY"
+
           ISSUES_FOUND=false
-          
+
           # Test Python linting
           if find . -name "*.py" | grep -q "test-fixes"; then
-            echo "### Python Issues Detection" >> $GITHUB_STEP_SUMMARY
-            
+            echo "### Python Issues Detection" >> "$GITHUB_STEP_SUMMARY"
+
             # Flake8
             if ! flake8 test-fixes/*.py 2>/dev/null; then
               ISSUES_FOUND=true
-              echo "- ✅ Flake8 correctly detected issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Flake8 correctly detected issues" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Flake8 failed to detect issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Flake8 failed to detect issues" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
             # Black formatting
             if ! black --check test-fixes/*.py 2>/dev/null; then
               ISSUES_FOUND=true
-              echo "- ✅ Black correctly detected formatting issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Black correctly detected formatting issues" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Black failed to detect formatting issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Black failed to detect formatting issues" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
             # Python syntax
             if ! python -m py_compile test-fixes/*.py 2>/dev/null; then
               ISSUES_FOUND=true
-              echo "- ✅ Python compiler correctly detected syntax errors" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Python compiler correctly detected syntax errors" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Python compiler failed to detect syntax errors" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Python compiler failed to detect syntax errors" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
-          
+
           # Test JavaScript linting
           if find . -name "*.js" | grep -q "test-fixes"; then
-            echo "### JavaScript Issues Detection" >> $GITHUB_STEP_SUMMARY
-            
+            echo "### JavaScript Issues Detection" >> "$GITHUB_STEP_SUMMARY"
+
             # Basic syntax check
             if ! node -c test-fixes/*.js 2>/dev/null; then
               ISSUES_FOUND=true
-              echo "- ✅ Node.js correctly detected syntax issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Node.js correctly detected syntax issues" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Node.js failed to detect syntax issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Node.js failed to detect syntax issues" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
-          
+
           # Test YAML linting
           if find . -name "*.yml" | grep -q "test-fixes"; then
-            echo "### YAML Issues Detection" >> $GITHUB_STEP_SUMMARY
-            
+            echo "### YAML Issues Detection" >> "$GITHUB_STEP_SUMMARY"
+
             if ! yamllint test-fixes/*.yml 2>/dev/null; then
               ISSUES_FOUND=true
-              echo "- ✅ yamllint correctly detected issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ yamllint correctly detected issues" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ yamllint failed to detect issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ yamllint failed to detect issues" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
-          
-          echo "issues_detected=$ISSUES_FOUND" >> $GITHUB_OUTPUT
+
+          echo "issues_detected=${ISSUES_FOUND}" >> "$GITHUB_OUTPUT"
 
       - name: Test Claude integration
-        if: secrets.ANTHROPIC_API_KEY != '' && (github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'claude-integration')
+        if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'claude-integration'
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          echo "## 🤖 Testing Claude Integration" >> $GITHUB_STEP_SUMMARY
-          
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "⚠️ ANTHROPIC_API_KEY not set, skipping Claude integration test"
+            exit 0
+          fi
+          echo "## 🤖 Testing Claude Integration" >> "$GITHUB_STEP_SUMMARY"
+
           # Install Anthropic SDK
           pip install anthropic
-          
+
           # Test basic Claude connectivity
           cat > test_claude.py << 'EOF'
           import os
@@ -252,7 +256,7 @@ jobs:
               if not api_key:
                   print("❌ ANTHROPIC_API_KEY not found")
                   return False
-              
+
               try:
                   client = Anthropic(api_key=api_key)
                   response = client.messages.create(
@@ -260,14 +264,14 @@ jobs:
                       max_tokens=50,
                       messages=[{"role": "user", "content": "Say 'Connection test successful' if you can read this."}]
                   )
-                  
+
                   if "successful" in response.content[0].text.lower():
                       print("✅ Claude connection successful")
                       return True
                   else:
                       print("❌ Claude response unexpected")
                       return False
-                      
+
               except Exception as e:
                   print(f"❌ Claude connection error: {e}")
                   return False
@@ -276,111 +280,118 @@ jobs:
               success = test_claude_connection()
               sys.exit(0 if success else 1)
           EOF
-          
+
           if python test_claude.py; then
-            echo "- ✅ Claude API connection successful" >> $GITHUB_STEP_SUMMARY
+            echo "- ✅ Claude API connection successful" >> "$GITHUB_STEP_SUMMARY"
           else
-            echo "- ❌ Claude API connection failed" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Claude API connection failed" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Test actual auto-fix process
         if: github.event.inputs.test_type == 'all' || github.event.inputs.test_type == 'formatting-only'
         run: |
-          echo "## 🎨 Testing Auto-Fix Process" >> $GITHUB_STEP_SUMMARY
-          
+          echo "## 🎨 Testing Auto-Fix Process" >> "$GITHUB_STEP_SUMMARY"
+
           # Test Python formatting fixes
           if find . -name "*.py" | grep -q "test-fixes"; then
-            echo "Testing Python auto-formatting..." >> $GITHUB_STEP_SUMMARY
-            
+            echo "Testing Python auto-formatting..." >> "$GITHUB_STEP_SUMMARY"
+
             # Create backup
             cp test-fixes/test_python_issues.py test-fixes/test_python_issues.py.bak
-            
+
             # Apply Black formatting (this should work even with syntax errors in comments)
             if black --safe test-fixes/test_python_issues.py 2>/dev/null; then
-              echo "- ✅ Black formatting applied" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Black formatting applied" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ⚠️ Black formatting had issues (expected due to syntax errors)" >> $GITHUB_STEP_SUMMARY
+              echo "- ⚠️ Black formatting had issues (expected due to syntax errors)" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
             # Apply isort
             if isort test-fixes/test_python_issues.py 2>/dev/null; then
-              echo "- ✅ Import sorting applied" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Import sorting applied" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ⚠️ Import sorting had issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ⚠️ Import sorting had issues" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
-          
+
           # Test JavaScript formatting
           if find . -name "*.js" | grep -q "test-fixes" && command -v prettier &>/dev/null; then
-            echo "Testing JavaScript auto-formatting..." >> $GITHUB_STEP_SUMMARY
-            
+            echo "Testing JavaScript auto-formatting..." >> "$GITHUB_STEP_SUMMARY"
+
             if prettier --write test-fixes/test_js_issues.js 2>/dev/null; then
-              echo "- ✅ Prettier formatting applied" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Prettier formatting applied" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ⚠️ Prettier formatting had issues" >> $GITHUB_STEP_SUMMARY
+              echo "- ⚠️ Prettier formatting had issues" >> "$GITHUB_STEP_SUMMARY"
             fi
           fi
 
       - name: Validate workflow configuration
         run: |
-          echo "## ⚙️ Validating Workflow Configuration" >> $GITHUB_STEP_SUMMARY
-          
+          echo "## ⚙️ Validating Workflow Configuration" >> "$GITHUB_STEP_SUMMARY"
+
           # Check if auto-fix workflow exists
           if [ -f ".github/workflows/auto-fix.yml" ]; then
-            echo "- ✅ Auto-fix workflow file exists" >> $GITHUB_STEP_SUMMARY
-            
+            echo "- ✅ Auto-fix workflow file exists" >> "$GITHUB_STEP_SUMMARY"
+
             # Validate YAML syntax
             if python -c "import yaml; yaml.safe_load(open('.github/workflows/auto-fix.yml'))" 2>/dev/null; then
-              echo "- ✅ Workflow YAML syntax is valid" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Workflow YAML syntax is valid" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Workflow YAML syntax is invalid" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Workflow YAML syntax is invalid" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
             # Check for required permissions
             if grep -q "contents: write" .github/workflows/auto-fix.yml; then
-              echo "- ✅ Required permissions configured" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Required permissions configured" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Missing required permissions" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Missing required permissions" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
             # Check for Claude integration
             if grep -q "ANTHROPIC_API_KEY" .github/workflows/auto-fix.yml; then
-              echo "- ✅ Claude integration configured" >> $GITHUB_STEP_SUMMARY
+              echo "- ✅ Claude integration configured" >> "$GITHUB_STEP_SUMMARY"
             else
-              echo "- ❌ Claude integration not found" >> $GITHUB_STEP_SUMMARY
+              echo "- ❌ Claude integration not found" >> "$GITHUB_STEP_SUMMARY"
             fi
-            
+
           else
-            echo "- ❌ Auto-fix workflow file not found" >> $GITHUB_STEP_SUMMARY
+            echo "- ❌ Auto-fix workflow file not found" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Generate test report
         if: always()
+        env:
+          TEST_TYPE: ${{ github.event.inputs.test_type }}
+          CREATE_ISSUES: ${{ github.event.inputs.create_issues }}
+          ISSUES_DETECTED: ${{ steps.lint-test.outputs.issues_detected }}
+          HAS_API_KEY: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         run: |
-          echo "## 📊 Test Summary Report" >> $GITHUB_STEP_SUMMARY
-          echo "- **Test Type**: ${{ github.event.inputs.test_type }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Issues Created**: ${{ github.event.inputs.create_issues }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Issues Detected**: ${{ steps.lint-test.outputs.issues_detected || 'unknown' }}" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "${{ secrets.ANTHROPIC_API_KEY }}" != "" ]; then
-            echo "- **Claude Integration**: ✅ API Key Available" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- **Claude Integration**: ❌ API Key Missing" >> $GITHUB_STEP_SUMMARY
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review test results above" >> $GITHUB_STEP_SUMMARY
-          echo "2. If issues detected correctly, the auto-fix workflow should work" >> $GITHUB_STEP_SUMMARY
-          echo "3. Create a PR with actual issues to test full integration" >> $GITHUB_STEP_SUMMARY
-          echo "4. Monitor the auto-fix workflow in the Actions tab" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 📊 Test Summary Report"
+            echo "- **Test Type**: ${TEST_TYPE}"
+            echo "- **Issues Created**: ${CREATE_ISSUES}"
+            echo "- **Issues Detected**: ${ISSUES_DETECTED:-unknown}"
+
+            if [ "${HAS_API_KEY}" = "true" ]; then
+              echo "- **Claude Integration**: ✅ API Key Available"
+            else
+              echo "- **Claude Integration**: ❌ API Key Missing"
+            fi
+
+            echo ""
+            echo "### Next Steps"
+            echo "1. Review test results above"
+            echo "2. If issues detected correctly, the auto-fix workflow should work"
+            echo "3. Create a PR with actual issues to test full integration"
+            echo "4. Monitor the auto-fix workflow in the Actions tab"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   cleanup:
     name: Cleanup Test Files
     runs-on: ubuntu-latest
     needs: [setup-test, test-auto-fix]
     if: always() && needs.setup-test.outputs.test-files-created == 'true'
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -391,7 +402,7 @@ jobs:
       - name: Remove test files
         run: |
           echo "Cleaning up test files..."
-          
+
           # Remove test directory
           if [ -d "test-fixes" ]; then
             rm -rf test-fixes
@@ -404,7 +415,7 @@ jobs:
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "Test Auto-Fix Bot"
-          
+
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "test: cleanup auto-fix test files"
