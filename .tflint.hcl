@@ -146,12 +146,7 @@ rule "aws_ebs_volume_invalid_type" {
 # Additional Rules (GCP-specific)
 # =============================================================================
 
-# Ensure GCE instances use valid machine types
-rule "google_compute_instance_invalid_machine_type" {
-  enabled = true
-}
-
-# Ensure Cloud SQL uses valid tiers
-rule "google_sql_database_instance_invalid_tier" {
-  enabled = true
-}
+# Note: GCP-specific rules are automatically enabled by the google plugin.
+# Only add rules here if you need to customize their behavior.
+# The plugin includes rules for compute instances, Cloud SQL, GKE, etc.
+# See: https://github.com/terraform-linters/tflint-ruleset-google/blob/main/docs/rules/README.md

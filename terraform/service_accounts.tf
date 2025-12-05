@@ -23,9 +23,9 @@ resource "google_service_account" "app" {
 # IAM roles for application service account
 resource "google_project_iam_member" "app_roles" {
   for_each = var.enable_gcp ? toset([
-    "roles/logging.logWriter",          # Write logs to Cloud Logging
-    "roles/monitoring.metricWriter",    # Write metrics to Cloud Monitoring
-    "roles/cloudtrace.agent",           # Send traces to Cloud Trace
+    "roles/logging.logWriter",            # Write logs to Cloud Logging
+    "roles/monitoring.metricWriter",      # Write metrics to Cloud Monitoring
+    "roles/cloudtrace.agent",             # Send traces to Cloud Trace
     "roles/secretmanager.secretAccessor", # Access secrets
   ]) : []
 
@@ -50,12 +50,12 @@ resource "google_service_account" "cicd" {
 # IAM roles for CI/CD service account
 resource "google_project_iam_member" "cicd_roles" {
   for_each = var.enable_gcp ? toset([
-    "roles/cloudbuild.builds.builder",       # Run Cloud Build
-    "roles/run.admin",                        # Deploy to Cloud Run
-    "roles/storage.admin",                    # Access storage buckets
-    "roles/artifactregistry.writer",          # Push container images
-    "roles/iam.serviceAccountUser",           # Act as service accounts
-    "roles/secretmanager.secretAccessor",     # Access deployment secrets
+    "roles/cloudbuild.builds.builder",    # Run Cloud Build
+    "roles/run.admin",                    # Deploy to Cloud Run
+    "roles/storage.admin",                # Access storage buckets
+    "roles/artifactregistry.writer",      # Push container images
+    "roles/iam.serviceAccountUser",       # Act as service accounts
+    "roles/secretmanager.secretAccessor", # Access deployment secrets
   ]) : []
 
   project = var.gcp_project_id
@@ -80,14 +80,14 @@ resource "google_service_account" "terraform" {
 # Note: These are broad permissions - restrict further based on your needs
 resource "google_project_iam_member" "terraform_roles" {
   for_each = var.enable_gcp ? toset([
-    "roles/compute.admin",            # Manage compute resources
-    "roles/storage.admin",            # Manage storage buckets
-    "roles/iam.serviceAccountAdmin",  # Manage service accounts
+    "roles/compute.admin",                   # Manage compute resources
+    "roles/storage.admin",                   # Manage storage buckets
+    "roles/iam.serviceAccountAdmin",         # Manage service accounts
     "roles/resourcemanager.projectIamAdmin", # Manage project IAM
-    "roles/secretmanager.admin",      # Manage secrets
-    "roles/cloudsql.admin",           # Manage Cloud SQL (if used)
-    "roles/run.admin",                # Manage Cloud Run
-    "roles/cloudbuild.builds.editor", # Manage Cloud Build triggers
+    "roles/secretmanager.admin",             # Manage secrets
+    "roles/cloudsql.admin",                  # Manage Cloud SQL (if used)
+    "roles/run.admin",                       # Manage Cloud Run
+    "roles/cloudbuild.builds.editor",        # Manage Cloud Build triggers
   ]) : []
 
   project = var.gcp_project_id

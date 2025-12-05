@@ -93,8 +93,6 @@ jobs:
           sarif_upload: true
           scm_token: ${{ secrets.GITHUB_TOKEN }}
           verbose: true
-          # Skip rules that are intentionally configured for template examples
-          skip_rules: AC_AWS_0321,AC_AWS_0322
 
       - name: Upload SARIF
         if: always()

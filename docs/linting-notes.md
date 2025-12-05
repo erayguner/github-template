@@ -133,23 +133,21 @@ pattern: "*.yaml"  # Glob patterns need quotes
 
 **File:** `.terrascan.toml`
 
-### Skipped Rules
+### Security Group Configuration
 
-The following rules are skipped for this template repository:
+This template uses security group references instead of CIDR blocks for internal traffic, which satisfies Terrascan security checks:
 
-| Rule ID | Name | Reason |
-|---------|------|--------|
-| `AC_AWS_0321` | networkPort80ExposedToprivate | Template demonstrates VPC-restricted HTTP |
-| `AC_AWS_0322` | networkPort443ExposedToprivate | Template demonstrates VPC-restricted HTTPS |
+- **No HTTP (port 80)**: Template uses HTTPS only
+- **Security group references**: Internal ALB to web server traffic uses security group references, not CIDR blocks
+- **Default security group**: Explicitly restricts all traffic
 
 ### Production Recommendations
 
 When using this template in production:
 
-1. **Remove skip rules** from `.terrascan.toml`
-2. **Restrict security group CIDRs** to specific IP ranges
-3. **Consider removing HTTP (port 80)** entirely and using HTTPS only
-4. **Add load balancer** with WAF for public-facing services
+1. **Add ingress rules** to the internal ALB security group for your specific use case (VPN, bastion, etc.)
+2. **Configure WAF** on your load balancer for public-facing services
+3. **Review egress rules** and restrict to specific endpoints if possible
 
 ### Running Terrascan
 
