@@ -10,7 +10,7 @@ on:
         type: choice
         options:
           - 'ci_failure'
-          - 'pr_trigger' 
+          - 'pr_trigger'
           - 'manual_trigger'
           - 'check_suite_failure'
 
@@ -38,17 +38,17 @@ jobs:
           cat > test_trigger_file.py << 'EOF'
           def broken_function()  # Missing colon
               return "This will fail"
-          
+
           # Bad formatting
           x=1;y=2;z=x+y
           EOF
-          
+
           git config --local user.email "test@example.com"
           git config --local user.name "Test Bot"
           git add test_trigger_file.py
           git commit -m "test: add broken file to trigger CI failure"
           git push
-      
+
       - name: Intentionally fail this workflow
         run: |
           echo "Simulating CI failure..."
@@ -57,7 +57,7 @@ jobs:
   test-auto-fix-trigger:
     name: Test Auto-Fix Trigger Logic
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Test trigger conditions
         run: |

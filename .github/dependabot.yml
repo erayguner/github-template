@@ -179,7 +179,7 @@ groups:
       - "minor"
       - "patch"
 
-  # Group all development dependencies together  
+  # Group all development dependencies together
   development-dependencies:
     applies-to: version-updates
     patterns:

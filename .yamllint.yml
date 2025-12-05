@@ -111,13 +111,9 @@ rules:
     forbid-implicit-octal: true
     forbid-explicit-octal: false
 
-  # Quoted strings
-  quoted-strings:
-    quote-type: any
-    required: only-when-needed
-    extra-required: []
-    extra-allowed: []
-    allow-quoted-quotes: true
+  # Quoted strings - disabled because GitHub Actions workflows commonly use
+  # quotes for consistency even when not strictly required
+  quoted-strings: disable
 
   # Trailing spaces
   trailing-spaces: enable
