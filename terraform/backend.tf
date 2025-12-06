@@ -2,7 +2,7 @@
 # This file configures remote state storage in Google Cloud Storage
 #
 # IMPORTANT: Before using this backend, you must:
-# 1. Create the GCS bucket: gsutil mb -l us-central1 gs://${PROJECT_ID}-terraform-state
+# 1. Create the GCS bucket: gsutil mb -l europe-west2 gs://${PROJECT_ID}-terraform-state
 # 2. Enable versioning: gsutil versioning set on gs://${PROJECT_ID}-terraform-state
 # 3. Set up IAM permissions for the service account
 #
@@ -34,7 +34,7 @@ terraform {
   # backend "s3" {
   #   bucket         = "YOUR_BUCKET_NAME-terraform-state"
   #   key            = "terraform.tfstate"
-  #   region         = "us-west-2"
+  #   region         = "eu-west-2"
   #   encrypt        = true
   #   dynamodb_table = "terraform-state-lock"
   #

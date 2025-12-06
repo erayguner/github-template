@@ -225,7 +225,7 @@ substitutions:
   _TF_STATE_BUCKET: '${PROJECT_ID}-terraform-state'
   _PROJECT_NAME: 'my-project'
   _ENVIRONMENT: 'dev'
-  _GCP_REGION: 'us-central1'
+  _GCP_REGION: 'europe-west2'
 
 # Build configuration
 options:
@@ -295,19 +295,19 @@ gcloud builds triggers create github \
 # Create bucket for build logs
 gcloud storage buckets create gs://${GCP_PROJECT_ID}-build-logs \
   --project=$GCP_PROJECT_ID \
-  --location=us-central1 \
+  --location=europe-west2 \
   --uniform-bucket-level-access
 
 # Create bucket for build artifacts
 gcloud storage buckets create gs://${GCP_PROJECT_ID}-build-artifacts \
   --project=$GCP_PROJECT_ID \
-  --location=us-central1 \
+  --location=europe-west2 \
   --uniform-bucket-level-access
 
 # Create bucket for Terraform state (if not already created)
 gcloud storage buckets create gs://${GCP_PROJECT_ID}-terraform-state \
   --project=$GCP_PROJECT_ID \
-  --location=us-central1 \
+  --location=europe-west2 \
   --uniform-bucket-level-access \
   --versioning
 ```

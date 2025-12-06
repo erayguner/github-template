@@ -121,7 +121,7 @@ variable "environment" {
 variable "region" {
   description = "Cloud provider region"
   type        = string
-  default     = "us-west-2"
+  default     = "eu-west-2"
 }
 
 variable "project_name" {
@@ -137,7 +137,7 @@ Set these environment variables or use a `.tfvars` file:
 ```bash
 export TF_VAR_environment="dev"
 export TF_VAR_project_name="my-project"
-export TF_VAR_region="us-west-2"
+export TF_VAR_region="eu-west-2"
 ```
 
 Or create a `terraform.tfvars` file:
@@ -145,7 +145,7 @@ Or create a `terraform.tfvars` file:
 ```hcl
 environment  = "dev"
 project_name = "my-project"
-region      = "us-west-2"
+region      = "eu-west-2"
 ```
 
 ## 🏗️ Architecture

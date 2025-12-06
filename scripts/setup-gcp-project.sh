@@ -14,8 +14,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-DEFAULT_REGION="us-central1"
-DEFAULT_ZONE="us-central1-a"
+DEFAULT_REGION="europe-west2"
+DEFAULT_ZONE="europe-west2-a"
 SA_NAME="github-actions-terraform"
 SKIP_BILLING_CHECK=false
 SKIP_API_ENABLE=false
@@ -63,8 +63,8 @@ Required:
     GCP_PROJECT_ID          Your Google Cloud Project ID
 
 Options:
-    -r, --region REGION     GCP region (default: us-central1)
-    -z, --zone ZONE         GCP zone (default: us-central1-a)
+    -r, --region REGION     GCP region (default: europe-west2)
+    -z, --zone ZONE         GCP zone (default: europe-west2-a)
     --sa-name NAME          Service account name (default: github-actions-terraform)
     --skip-billing          Skip billing account check
     --skip-apis             Skip enabling APIs
@@ -77,7 +77,7 @@ Examples:
     $0 my-gcp-project-123
 
     # Custom region and zone
-    $0 my-gcp-project-123 -r europe-west1 -z europe-west1-b
+    $0 my-gcp-project-123 -r us-central1 -z us-central1-a
 
     # Skip billing check (useful for existing projects)
     $0 my-gcp-project-123 --skip-billing

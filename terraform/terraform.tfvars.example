@@ -32,11 +32,11 @@ enable_gcp     = false
 # AWS CONFIGURATION (when enable_aws = true)
 # =============================================================================
 
-aws_region = "us-west-2"
+aws_region = "eu-west-2"
 
 # Alternative AWS regions:
 # aws_region = "us-east-1"      # US East (N. Virginia)
-# aws_region = "us-east-2"      # US East (Ohio)
+# aws_region = "us-west-2"      # US West (Oregon)
 # aws_region = "eu-west-1"      # Europe (Ireland)
 # aws_region = "eu-central-1"   # Europe (Frankfurt)
 # aws_region = "ap-southeast-1" # Asia Pacific (Singapore)
@@ -46,12 +46,12 @@ aws_region = "us-west-2"
 # =============================================================================
 
 gcp_project_id = "my-gcp-project-id"
-gcp_region     = "us-central1"
-gcp_zone       = "us-central1-a"
+gcp_region     = "europe-west2"
+gcp_zone       = "europe-west2-a"
 
 # Alternative GCP regions:
+# gcp_region = "us-central1"    # Iowa
 # gcp_region = "us-east1"       # South Carolina
-# gcp_region = "us-west1"       # Oregon
 # gcp_region = "europe-west1"   # Belgium
 # gcp_region = "europe-west4"   # Netherlands
 # gcp_region = "asia-east1"     # Taiwan
@@ -103,7 +103,7 @@ tags = {
 # cloud_provider = "aws"
 # enable_aws     = true
 # enable_gcp     = false
-# aws_region     = "us-west-2"
+# aws_region     = "eu-west-2"
 # instance_type  = "t3.micro"
 
 # Example 2: Production Environment (GCP)
@@ -113,7 +113,7 @@ tags = {
 # enable_aws     = false
 # enable_gcp     = true
 # gcp_project_id = "my-production-project"
-# gcp_region     = "us-central1"
+# gcp_region     = "europe-west2"
 
 # Example 3: Multi-Cloud Setup
 # project_name   = "myapp-multi"
@@ -121,9 +121,9 @@ tags = {
 # cloud_provider = "multi"
 # enable_aws     = true
 # enable_gcp     = true
-# aws_region     = "us-west-2"
+# aws_region     = "eu-west-2"
 # gcp_project_id = "my-staging-project"
-# gcp_region     = "us-central1"
+# gcp_region     = "europe-west2"
 
 # =============================================================================
 # GITHUB INTEGRATION (for Workload Identity Federation)
@@ -170,8 +170,8 @@ cloud_run_max_instances = 10        # Max instances for auto-scaling
 # enable_aws              = false
 # enable_gcp              = true
 # gcp_project_id          = "my-gcp-project-123456"
-# gcp_region              = "us-central1"
-# gcp_zone                = "us-central1-a"
+# gcp_region              = "europe-west2"
+# gcp_zone                = "europe-west2-a"
 # vpc_cidr                = "10.0.0.0/16"
 # github_org              = "mycompany"
 # github_repo             = "my-gcp-app"
