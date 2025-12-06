@@ -2,8 +2,8 @@
 
 <!-- Banner Image -->
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:4285F4,100:34A853&height=200&section=header&text=GCP%20Terraform%20Template&fontSize=40&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Production-Ready%20Infrastructure%20as%20Code&descAlignY=55&descSize=18">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:4285F4,100:34A853&height=200&section=header&text=GCP%20Terraform%20Template&fontSize=40&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Production-Ready%20Infrastructure%20as%20Code&descAlignY=55&descSize=18" alt="GCP Terraform Template Banner"/>
+  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:4285F4,100:FF9900&height=200&section=header&text=Multi-Cloud%20Terraform%20Template&fontSize=36&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Production-Ready%20Infrastructure%20as%20Code%20for%20AWS%20%26%20GCP&descAlignY=55&descSize=16">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:4285F4,100:FF9900&height=200&section=header&text=Multi-Cloud%20Terraform%20Template&fontSize=36&fontColor=ffffff&animation=fadeIn&fontAlignY=35&desc=Production-Ready%20Infrastructure%20as%20Code%20for%20AWS%20%26%20GCP&descAlignY=55&descSize=16" alt="Multi-Cloud Terraform Template Banner"/>
 </picture>
 
 <!-- Badges Row 1: Status -->
@@ -14,8 +14,8 @@
   <a href="https://github.com/erayguner/github-template/actions/workflows/security.yml">
     <img src="https://github.com/erayguner/github-template/actions/workflows/security.yml/badge.svg?branch=main" alt="Security Analysis"/>
   </a>
-  <a href="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml">
-    <img src="https://github.com/erayguner/github-template/actions/workflows/mega-linter.yml/badge.svg?branch=main" alt="MegaLinter"/>
+  <a href="https://github.com/erayguner/github-template/actions/workflows/terraform.yml">
+    <img src="https://github.com/erayguner/github-template/actions/workflows/terraform.yml/badge.svg?branch=main" alt="Terraform"/>
   </a>
   <a href="https://opensource.org/licenses/MIT">
     <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT"/>
@@ -24,9 +24,9 @@
 
 <!-- Badges Row 2: Technologies -->
 <p>
+  <img src="https://img.shields.io/badge/AWS-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white" alt="Amazon Web Services"/>
   <img src="https://img.shields.io/badge/Google_Cloud-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white" alt="Google Cloud Platform"/>
   <img src="https://img.shields.io/badge/Terraform-1.10+-7B42BC?style=for-the-badge&logo=terraform&logoColor=white" alt="Terraform 1.10+"/>
-  <img src="https://img.shields.io/badge/Cloud_Build-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white" alt="Cloud Build"/>
   <img src="https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.11+"/>
 </p>
 
@@ -36,7 +36,7 @@
   <img src="https://img.shields.io/badge/Security-checkov-2B9348?logo=checkov&logoColor=white" alt="checkov"/>
   <img src="https://img.shields.io/badge/Security-gitleaks-2B9348?logo=git&logoColor=white" alt="gitleaks"/>
   <img src="https://img.shields.io/badge/Security-CodeQL-2B9348?logo=github&logoColor=white" alt="CodeQL"/>
-  <img src="https://img.shields.io/badge/MegaLinter-Enabled-brightgreen?logo=mega&logoColor=white" alt="MegaLinter"/>
+  <img src="https://img.shields.io/badge/Security-TruffleHog-2B9348?logo=git&logoColor=white" alt="TruffleHog"/>
 </p>
 
 <!-- Navigation -->
@@ -54,10 +54,16 @@
 
 ## What is this?
 
-A **production-ready GitHub template** for deploying infrastructure to **Google Cloud Platform** using Terraform. Perfect for developers and teams onboarding their first project to GCP with enterprise-grade CI/CD, security scanning, and best practices baked in.
+A **production-ready GitHub template** for deploying infrastructure to **AWS**, **Google Cloud Platform**, or **both** using Terraform. Perfect for developers and teams who need enterprise-grade CI/CD, comprehensive security scanning, and infrastructure best practices out of the box.
+
+**Key Highlights:**
+- **Multi-Cloud**: Deploy to AWS, GCP, or both simultaneously
+- **13 CI/CD Workflows**: Automated testing, security scanning, and deployment
+- **8+ Security Tools**: tfsec, Checkov, Gitleaks, TruffleHog, Bandit, CodeQL, and more
+- **AI-Powered Auto-Fix**: Claude integration to automatically fix CI failures
 
 ```bash
-# Get started in under 5 minutes!
+# GCP Quick Start (5 minutes)
 ./scripts/setup-gcp-project.sh YOUR_GCP_PROJECT_ID
 ```
 
@@ -67,12 +73,12 @@ A **production-ready GitHub template** for deploying infrastructure to **Google 
 
 | Category | Features |
 |----------|----------|
-| **Infrastructure** | Terraform 1.10+, Multi-cloud support (AWS/GCP), Remote state with GCS backend |
-| **CI/CD** | GitHub Actions, Google Cloud Build, Automated deployments, Environment promotion |
-| **Security** | tfsec, checkov, gitleaks, CodeQL, TruffleHog, detect-secrets |
-| **Code Quality** | MegaLinter (70+ linters), Ruff, shellcheck, yamllint, actionlint |
-| **DevEx** | Pre-commit hooks, Makefile targets, UV package manager, Hot-reload workflows |
-| **Documentation** | Architecture diagrams, API reference, Runbooks, Troubleshooting guides |
+| **Infrastructure** | Terraform 1.10+, Multi-cloud (AWS & GCP), Remote state backends, Workload Identity Federation |
+| **CI/CD** | 13 GitHub Actions workflows, Google Cloud Build integration, Automated deployments |
+| **Security** | tfsec, Checkov, Gitleaks, TruffleHog, Bandit, CodeQL, Trivy, detect-secrets |
+| **Code Quality** | Ruff (Python), TFLint, shellcheck, yamllint, actionlint, Hadolint |
+| **DevEx** | Pre-commit hooks, Makefile targets, UV package manager, Claude AI auto-fix |
+| **Documentation** | Setup guides, Architecture diagrams, Multi-cloud guides, API reference |
 
 ---
 
@@ -139,48 +145,43 @@ make validate-all
 │                              GitHub Repository                               │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐         │
-│  │   Pre-commit    │───▶│  GitHub Actions │───▶│  Cloud Build    │         │
-│  │     Hooks       │    │    CI/CD        │    │   Deployment    │         │
+│  │   Pre-commit    │───▶│  GitHub Actions │───▶│    Deployment   │         │
+│  │     Hooks       │    │  (13 workflows) │    │  (Cloud Build)  │         │
 │  └─────────────────┘    └─────────────────┘    └─────────────────┘         │
 │         │                       │                      │                    │
 │         ▼                       ▼                      ▼                    │
 │  ┌─────────────────────────────────────────────────────────────────────┐   │
 │  │                    Security Scanning Pipeline                        │   │
-│  │  ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐ ┌─────────┐       │   │
-│  │  │ tfsec   │ │ checkov │ │gitleaks │ │ CodeQL  │ │TruffleHog│       │   │
-│  │  └─────────┘ └─────────┘ └─────────┘ └─────────┘ └─────────┘       │   │
+│  │  ┌───────┐ ┌─────────┐ ┌─────────┐ ┌────────┐ ┌───────────┐ ┌─────┐│   │
+│  │  │ tfsec │ │ checkov │ │gitleaks │ │ CodeQL │ │TruffleHog │ │Trivy││   │
+│  │  └───────┘ └─────────┘ └─────────┘ └────────┘ └───────────┘ └─────┘│   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────────────┘
-                                     │
-                                     ▼
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Google Cloud Platform                              │
-├─────────────────────────────────────────────────────────────────────────────┤
-│  ┌───────────────┐    ┌───────────────┐    ┌───────────────┐               │
-│  │   Cloud Run   │    │  Cloud SQL    │    │ Cloud Storage │               │
-│  │   Services    │    │   Databases   │    │    Buckets    │               │
-│  └───────────────┘    └───────────────┘    └───────────────┘               │
-│         │                    │                     │                        │
-│         └────────────────────┼─────────────────────┘                        │
-│                              ▼                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                         VPC Network                                  │   │
-│  │  ┌─────────────────┐         ┌─────────────────┐                    │   │
-│  │  │  Public Subnet  │         │  Private Subnet │                    │   │
-│  │  │  (NAT Gateway)  │         │   (Internal)    │                    │   │
-│  │  └─────────────────┘         └─────────────────┘                    │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-│                              │                                              │
-│                              ▼                                              │
-│  ┌─────────────────────────────────────────────────────────────────────┐   │
-│  │                    Security & IAM                                    │   │
-│  │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐       │   │
-│  │  │  Service   │ │  Workload  │ │   Secret   │ │    IAM     │       │   │
-│  │  │  Accounts  │ │  Identity  │ │   Manager  │ │   Roles    │       │   │
-│  │  └────────────┘ └────────────┘ └────────────┘ └────────────┘       │   │
-│  └─────────────────────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────────────────────┘
+                          │                       │
+            ┌─────────────┘                       └─────────────┐
+            ▼                                                   ▼
+┌───────────────────────────────────┐     ┌───────────────────────────────────┐
+│      Amazon Web Services (AWS)    │     │    Google Cloud Platform (GCP)    │
+├───────────────────────────────────┤     ├───────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐       │     │  ┌───────────┐  ┌─────────────┐   │
+│  │   VPC    │  │   IAM    │       │     │  │ Cloud Run │  │Cloud Storage│   │
+│  │ Subnets  │  │  Roles   │       │     │  │ Services  │  │   Buckets   │   │
+│  └──────────┘  └──────────┘       │     │  └───────────┘  └─────────────┘   │
+│  ┌──────────┐  ┌──────────┐       │     │  ┌───────────┐  ┌─────────────┐   │
+│  │   KMS    │  │   ALB    │       │     │  │    VPC    │  │   Firewall  │   │
+│  │Encryption│  │  (Load)  │       │     │  │  Network  │  │    Rules    │   │
+│  └──────────┘  └──────────┘       │     │  └───────────┘  └─────────────┘   │
+│  ┌──────────────────────────┐     │     │  ┌───────────────────────────┐    │
+│  │     Security Groups      │     │     │  │   Workload Identity Fed   │    │
+│  │     VPC Flow Logs        │     │     │  │   Service Accounts        │    │
+│  └──────────────────────────┘     │     │  └───────────────────────────┘    │
+└───────────────────────────────────┘     └───────────────────────────────────┘
 ```
+
+**Multi-Cloud Options:**
+- **AWS Only**: `enable_aws = true, enable_gcp = false`
+- **GCP Only**: `enable_aws = false, enable_gcp = true`
+- **Multi-Cloud**: `enable_aws = true, enable_gcp = true`
 
 ---
 
@@ -189,41 +190,46 @@ make validate-all
 ```
 .
 ├── .github/
-│   ├── workflows/
-│   │   ├── ci.yml                 # Main CI/CD pipeline
-│   │   ├── cloud-build-deploy.yml # GCP Cloud Build deployment
-│   │   ├── security.yml           # Security scanning
-│   │   └── mega-linter.yml        # Code quality linting
-│   ├── ISSUE_TEMPLATE/            # Issue templates
+│   ├── workflows/                 # 13 CI/CD workflows
+│   │   ├── ci.yml                 # Main CI/CD pipeline (shell linting)
+│   │   ├── python.yml             # Python: Ruff, mypy, pytest
+│   │   ├── terraform.yml          # Terraform: fmt, validate, TFLint, tfsec, Checkov
+│   │   ├── security.yml           # Security: Gitleaks, Trivy, TruffleHog, Bandit
+│   │   ├── dependencies.yml       # Dependencies: SBOM, pip-audit, Grype
+│   │   ├── yaml.yml               # YAML linting
+│   │   ├── dockerfile.yml         # Docker: Hadolint
+│   │   ├── actionlint.yml         # GitHub Actions validation
+│   │   ├── auto-fix.yml           # Claude AI auto-fix for CI failures
+│   │   └── cloud-build-deploy.yml # GCP Cloud Build deployment
+│   ├── ISSUE_TEMPLATE/            # Bug & feature request templates
+│   ├── SETUP.md                   # Auto-fix setup guide
 │   └── PULL_REQUEST_TEMPLATE.md   # PR template
 ├── terraform/
-│   ├── main.tf                    # Main configuration
-│   ├── variables.tf               # Input variables
+│   ├── main.tf                    # Providers & locals
+│   ├── gcp.tf                     # GCP resources (VPC, Firewall, NAT)
+│   ├── aws.tf                     # AWS resources (VPC, IAM, KMS, ALB)
+│   ├── variables.tf               # Input variables with validation
 │   ├── outputs.tf                 # Output values
-│   ├── gcp.tf                     # GCP resources
-│   ├── aws.tf                     # AWS resources (optional)
-│   ├── backend.tf                 # State backend config
-│   ├── service_accounts.tf        # IAM service accounts
-│   ├── providers.tf               # Provider configuration
+│   ├── service_accounts.tf        # GCP service accounts & IAM
+│   ├── backend.tf                 # State backend configuration
 │   └── versions.tf                # Version constraints
 ├── python/
 │   ├── src/                       # Python source code
 │   ├── tests/                     # Test files
-│   ├── pyproject.toml             # Project configuration
-│   └── requirements.txt           # Dependencies
+│   └── pyproject.toml             # Project config with Ruff, mypy, pytest
 ├── scripts/
-│   └── setup-gcp-project.sh       # GCP project setup script
+│   └── setup-gcp-project.sh       # GCP one-command setup script
 ├── docs/
 │   ├── QUICK-START-GCP.md         # 5-minute GCP setup
 │   ├── GCP-SETUP.md               # Comprehensive GCP guide
 │   ├── CLOUD-BUILD.md             # Cloud Build integration
-│   ├── GCP-APIS-REFERENCE.md      # API reference
-│   └── multi-cloud.md             # Multi-cloud setup
-├── cloudbuild.yaml                # Cloud Build configuration
-├── .pre-commit-config.yaml        # Pre-commit hooks (security-focused)
-├── .tflint.hcl                    # TFLint configuration
-├── .yamllint.yml                  # YAML linting rules
+│   ├── TEMPLATE-USAGE.md          # How to customize this template
+│   └── multi-cloud.md             # AWS + GCP hybrid setup
+├── cloudbuild.yaml                # GCP Cloud Build configuration
+├── Dockerfile                     # Multi-stage Python container
 ├── Makefile                       # Development commands
+├── .pre-commit-config.yaml        # Pre-commit hooks
+├── .tflint.hcl                    # TFLint configuration
 └── README.md                      # This file
 ```
 
@@ -298,22 +304,22 @@ See [SECURITY.md](SECURITY.md) for our security policy and vulnerability reporti
 
 ## CI/CD Pipeline
 
-The pipeline runs automatically on every push and pull request:
+The pipeline runs automatically on every push and pull request with **13 specialized workflows**:
 
 ```
-┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-│  Pre-commit    │──▶│ GitHub Actions │──▶│  Cloud Build   │
-│    Hooks       │   │    CI/CD       │   │   Deployment   │
-└────────────────┘   └────────────────┘   └────────────────┘
-       │                    │                     │
-       ▼                    ▼                     ▼
-┌────────────────┐   ┌────────────────┐   ┌────────────────┐
-│ Local checks:  │   │ Pipeline jobs: │   │ Deploy stages: │
-│ • Formatting   │   │ • Lint & Test  │   │ • Build image  │
-│ • Linting      │   │ • Security     │   │ • Push to AR   │
-│ • Secrets      │   │ • Terraform    │   │ • Deploy CR    │
-│ • Terraform    │   │ • CodeQL       │   │ • Smoke tests  │
-└────────────────┘   └────────────────┘   └────────────────┘
+┌────────────────┐   ┌────────────────────────────────────────────┐   ┌────────────────┐
+│  Pre-commit    │──▶│           GitHub Actions (13 workflows)    │──▶│  Cloud Build   │
+│    Hooks       │   │                                            │   │   Deployment   │
+└────────────────┘   └────────────────────────────────────────────┘   └────────────────┘
+       │                              │                                      │
+       ▼                              ▼                                      ▼
+┌────────────────┐   ┌────────────────────────────────────────────┐   ┌────────────────┐
+│ Local checks:  │   │ Parallel workflows:                        │   │ Deploy stages: │
+│ • Ruff format  │   │ • ci.yml (shell), python.yml, terraform.yml│   │ • Build image  │
+│ • TFLint       │   │ • security.yml, dependencies.yml           │   │ • Push to AR   │
+│ • Gitleaks     │   │ • yaml.yml, dockerfile.yml, actionlint.yml │   │ • Deploy CR    │
+│ • detect-secrets│  │ • auto-fix.yml (Claude AI)                 │   │ • Smoke tests  │
+└────────────────┘   └────────────────────────────────────────────┘   └────────────────┘
 ```
 
 ---
@@ -342,12 +348,12 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) for deta
 
 <!-- Footer Banner -->
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:34A853,100:4285F4&height=100&section=footer">
-  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:34A853,100:4285F4&height=100&section=footer" alt="Footer"/>
+  <source media="(prefers-color-scheme: dark)" srcset="https://capsule-render.vercel.app/api?type=waving&color=0:FF9900,100:4285F4&height=100&section=footer">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=0:FF9900,100:4285F4&height=100&section=footer" alt="Footer"/>
 </picture>
 
 <p>
-  <strong>Made with Terraform and Google Cloud</strong>
+  <strong>Built with Terraform for AWS and Google Cloud</strong>
 </p>
 
 <p>

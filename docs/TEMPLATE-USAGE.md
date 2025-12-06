@@ -79,8 +79,9 @@ git push -u origin main
 | File/Location | What to Change | When |
 |---------------|----------------|------|
 | `terraform/aws.tf` | AWS resources | If not using AWS |
-| `.mega-linter.yml` | Linter configuration | If using different tools |
-| `cloudbuild.yaml` | Build steps | For custom deployments |
+| `terraform/gcp.tf` | GCP resources | If not using GCP |
+| `.pre-commit-config.yaml` | Pre-commit hooks | To customize linting tools |
+| `cloudbuild.yaml` | Build steps | For custom GCP deployments |
 
 ---
 
