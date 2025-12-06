@@ -18,10 +18,11 @@ updates:
     commit-message:
       prefix: "npm"
       include: "scope"
-    reviewers:
-      - "erayguner"  # Replace with actual GitHub username
-    assignees:
-      - "erayguner"  # Replace with actual GitHub username
+    # Uncomment and add your GitHub username for review assignments:
+    # reviewers:
+    #   - "your-username"
+    # assignees:
+    #   - "your-username"
     labels:
       - "dependencies"
       - "npm"
@@ -48,10 +49,11 @@ updates:
       prefix: "deps(python)"
       prefix-development: "deps-dev(python)"
       include: "scope"
-    reviewers:
-      - "erayguner"  # Replace with actual GitHub username
-    assignees:
-      - "erayguner"  # Replace with actual GitHub username
+    # Uncomment and add your GitHub username for review assignments:
+    # reviewers:
+    #   - "your-username"
+    # assignees:
+    #   - "your-username"
     labels:
       - "dependencies"
       - "python"
@@ -103,10 +105,11 @@ updates:
     commit-message:
       prefix: "deps(terraform)"
       include: "scope"
-    reviewers:
-      - "erayguner"
-    assignees:
-      - "erayguner"
+    # Uncomment and add your GitHub username for review assignments:
+    # reviewers:
+    #   - "your-username"
+    # assignees:
+    #   - "your-username"
     labels:
       - "dependencies"
       - "terraform"

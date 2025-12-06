@@ -37,19 +37,20 @@ This directory contains Terraform infrastructure as code configurations.
 
 ```
 terraform/
-├── environments/           # Environment-specific configurations
-│   ├── dev/
-│   ├── staging/
-│   └── prod/
-├── modules/               # Reusable Terraform modules
-│   ├── networking/
-│   ├── compute/
-│   └── storage/
-├── main.tf               # Main Terraform configuration
-├── variables.tf          # Input variables
-├── outputs.tf            # Output values
-├── versions.tf           # Provider version constraints
-└── README.md             # This file
+├── main.tf                    # Main Terraform configuration & providers
+├── variables.tf               # Input variables with validation
+├── outputs.tf                 # Output values for AWS & GCP
+├── versions.tf                # Provider version constraints
+├── providers.tf               # Provider configuration notes
+├── backend.tf                 # State backend configuration
+├── gcp.tf                     # GCP resources (VPC, Firewall, NAT)
+├── aws.tf                     # AWS resources (VPC, IAM, KMS, ALB)
+├── service_accounts.tf        # GCP service accounts & IAM
+├── terraform.tfvars.example   # Example variable configuration
+├── TERRAFORM_GUIDE.md         # Comprehensive usage guide
+├── README-MultiCloud.md       # Multi-cloud documentation
+├── MULTI_CLOUD_SUMMARY.md     # Architecture summary
+└── README.md                  # This file
 ```
 
 ## 🌩️ Multi-Cloud Support
