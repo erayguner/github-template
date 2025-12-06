@@ -11,7 +11,7 @@
 
 substitutions:
   _ENVIRONMENT: dev
-  _REGION: us-central1
+  _REGION: europe-west2
   _SERVICE_NAME: app
   _ARTIFACT_REGISTRY: docker-repo
 

@@ -118,8 +118,8 @@ environment    = "dev"
 # GCP Configuration
 enable_gcp      = true
 gcp_project_id  = "my-gcp-project-123456"
-gcp_region      = "us-central1"
-gcp_zone        = "us-central1-a"
+gcp_region      = "europe-west2"
+gcp_zone        = "europe-west2-a"
 
 # AWS Configuration (set to false if not using)
 enable_aws = false
@@ -322,7 +322,7 @@ your-custom-job:
 ```bash
 # Error: Backend configuration required
 # Solution: Ensure state bucket exists
-gsutil mb -l us-central1 gs://YOUR_PROJECT_ID-terraform-state
+gsutil mb -l europe-west2 gs://YOUR_PROJECT_ID-terraform-state
 gsutil versioning set on gs://YOUR_PROJECT_ID-terraform-state
 ```
 

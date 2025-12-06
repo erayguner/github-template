@@ -19,7 +19,7 @@ This template supports **AWS**, **Google Cloud Platform (GCP)**, or **both** pro
 cloud_provider = "aws"
 enable_aws     = true
 enable_gcp     = false
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 ```
 
 **Option B: GCP Only**
@@ -28,7 +28,7 @@ cloud_provider = "gcp"
 enable_aws     = false
 enable_gcp     = true
 gcp_project_id = "my-gcp-project"
-gcp_region     = "us-central1"
+gcp_region     = "europe-west2"
 ```
 
 **Option C: Multi-Cloud**
@@ -36,9 +36,9 @@ gcp_region     = "us-central1"
 cloud_provider = "multi"
 enable_aws     = true
 enable_gcp     = true
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 gcp_project_id = "my-gcp-project"
-gcp_region     = "us-central1"
+gcp_region     = "europe-west2"
 ```
 
 ### 2. Configure Variables
@@ -108,7 +108,7 @@ Hybrid Infrastructure
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `aws_region` | string | `"us-west-2"` | AWS region for resources |
+| `aws_region` | string | `"eu-west-2"` | AWS region for resources |
 | `instance_type` | string | `"t3.micro"` | EC2 instance type |
 
 ### GCP Variables
@@ -116,8 +116,8 @@ Hybrid Infrastructure
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `gcp_project_id` | string | `""` | GCP project ID (required if enable_gcp=true) |
-| `gcp_region` | string | `"us-central1"` | GCP region for resources |
-| `gcp_zone` | string | `"us-central1-a"` | GCP zone for resources |
+| `gcp_region` | string | `"europe-west2"` | GCP region for resources |
+| `gcp_zone` | string | `"europe-west2-a"` | GCP zone for resources |
 
 ## 🔒 Authentication Setup
 
@@ -132,7 +132,7 @@ aws configure
 ```bash
 export AWS_ACCESS_KEY_ID="your-access-key"
 export AWS_SECRET_ACCESS_KEY="your-secret-key"
-export AWS_DEFAULT_REGION="us-west-2"
+export AWS_DEFAULT_REGION="eu-west-2"
 ```
 
 **Option 3: IAM Role (recommended for CI/CD)**
@@ -170,7 +170,7 @@ environment    = "dev"
 cloud_provider = "aws"
 enable_aws     = true
 enable_gcp     = false
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 vpc_cidr       = "10.0.0.0/16"
 instance_type  = "t3.micro"
 ```
@@ -185,8 +185,8 @@ cloud_provider = "gcp"
 enable_aws     = false
 enable_gcp     = true
 gcp_project_id = "webapp-production-12345"
-gcp_region     = "us-central1"
-gcp_zone       = "us-central1-a"
+gcp_region     = "europe-west2"
+gcp_zone       = "europe-west2-a"
 vpc_cidr       = "10.0.0.0/16"
 ```
 
@@ -199,9 +199,9 @@ environment    = "staging"
 cloud_provider = "multi"
 enable_aws     = true
 enable_gcp     = true
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 gcp_project_id = "webapp-staging-67890"
-gcp_region     = "us-central1"
+gcp_region     = "europe-west2"
 vpc_cidr       = "10.0.0.0/16"
 ```
 
@@ -243,7 +243,7 @@ terraform {
   backend "s3" {
     bucket = "my-terraform-state-bucket"
     key    = "infrastructure/terraform.tfstate"
-    region = "us-west-2"
+    region = "eu-west-2"
   }
 }
 ```
@@ -264,7 +264,7 @@ terraform {
 # Multiple AWS regions
 provider "aws" {
   alias  = "primary"
-  region = "us-west-2"
+  region = "eu-west-2"
 }
 
 provider "aws" {
@@ -276,13 +276,13 @@ provider "aws" {
 provider "google" {
   alias   = "primary"
   project = var.gcp_project_id
-  region  = "us-central1"
+  region  = "europe-west2"
 }
 
 provider "google" {
   alias   = "secondary"
   project = var.gcp_project_id
-  region  = "europe-west1"
+  region  = "us-central1"
 }
 ```
 

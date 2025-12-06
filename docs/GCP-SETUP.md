@@ -181,7 +181,7 @@ rm github-actions-key.json
 ```bash
 # Create unique bucket name
 export TF_STATE_BUCKET="${GCP_PROJECT_ID}-terraform-state"
-export GCP_REGION="us-central1"
+export GCP_REGION="europe-west2"
 
 # Create bucket
 gcloud storage buckets create gs://$TF_STATE_BUCKET \
@@ -247,8 +247,8 @@ Create `terraform/terraform.tfvars`:
 ```hcl
 # GCP Configuration
 gcp_project_id = "YOUR_PROJECT_ID"
-gcp_region     = "us-central1"
-gcp_zone       = "us-central1-a"
+gcp_region     = "europe-west2"
+gcp_zone       = "europe-west2-a"
 
 # Enable GCP resources
 enable_gcp = true

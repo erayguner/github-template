@@ -41,7 +41,7 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  GCP_REGION: us-central1
+  GCP_REGION: europe-west2
   TERRAFORM_VERSION: 1.10.0
 
 permissions:

@@ -126,7 +126,7 @@ project_name    = "my-project"
 environment     = "dev"
 enable_aws      = true
 enable_gcp      = false
-aws_region      = "us-west-2"
+aws_region      = "eu-west-2"
 instance_type   = "t3.micro"
 ```
 
@@ -138,8 +138,8 @@ environment     = "dev"
 enable_aws      = false
 enable_gcp      = true
 gcp_project_id  = "my-gcp-project-id"
-gcp_region      = "us-central1"
-gcp_zone        = "us-central1-a"
+gcp_region      = "europe-west2"
+gcp_zone        = "europe-west2-a"
 ```
 
 **Multi-cloud deployment:**
@@ -150,10 +150,10 @@ environment     = "dev"
 enable_aws      = true
 enable_gcp      = true
 cloud_provider  = "multi"
-aws_region      = "us-west-2"
+aws_region      = "eu-west-2"
 gcp_project_id  = "my-gcp-project-id"
-gcp_region      = "us-central1"
-gcp_zone        = "us-central1-a"
+gcp_region      = "europe-west2"
+gcp_zone        = "europe-west2-a"
 ```
 
 ### 3. Initialize Terraform
@@ -243,7 +243,7 @@ terraform destroy -target=aws_vpc.main
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `aws_region` | string | `"us-west-2"` | AWS region for resources |
+| `aws_region` | string | `"eu-west-2"` | AWS region for resources |
 | `instance_type` | string | `"t3.micro"` | EC2 instance type |
 | `vpc_cidr` | string | `"10.0.0.0/16"` | CIDR block for VPC |
 
@@ -252,8 +252,8 @@ terraform destroy -target=aws_vpc.main
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
 | `gcp_project_id` | string | `""` | Google Cloud project ID |
-| `gcp_region` | string | `"us-central1"` | GCP region for resources |
-| `gcp_zone` | string | `"us-central1-a"` | GCP zone for resources |
+| `gcp_region` | string | `"europe-west2"` | GCP region for resources |
+| `gcp_zone` | string | `"europe-west2-a"` | GCP zone for resources |
 
 #### Additional Configuration
 
@@ -360,7 +360,7 @@ project_name    = "myapp"
 environment     = "dev"
 enable_aws      = true
 enable_gcp      = false
-aws_region      = "us-west-2"
+aws_region      = "eu-west-2"
 instance_type   = "t3.micro"
 enable_monitoring = true
 ```
@@ -372,9 +372,9 @@ environment     = "prod"
 enable_aws      = true
 enable_gcp      = true
 cloud_provider  = "multi"
-aws_region      = "us-east-1"
+aws_region      = "eu-west-2"
 gcp_project_id  = "myapp-prod"
-gcp_region      = "us-central1"
+gcp_region      = "europe-west2"
 instance_type   = "t3.large"
 backup_retention_days = 30
 ```
@@ -605,7 +605,7 @@ terraform {
   backend "s3" {
     bucket         = "my-terraform-state"
     key            = "prod/terraform.tfstate"
-    region         = "us-west-2"
+    region         = "eu-west-2"
     encrypt        = true
     dynamodb_table = "terraform-locks"
   }
@@ -615,7 +615,7 @@ terraform {
 **Setup:**
 ```bash
 # Create S3 bucket
-aws s3 mb s3://my-terraform-state --region us-west-2
+aws s3 mb s3://my-terraform-state --region eu-west-2
 
 # Enable versioning
 aws s3api put-bucket-versioning \
@@ -891,8 +891,8 @@ terraform plan -generate-config-out=generated.tf
 ```hcl
 # Multiple AWS regions
 provider "aws" {
-  alias  = "us-west"
-  region = "us-west-2"
+  alias  = "eu-west"
+  region = "eu-west-2"
 }
 
 provider "aws" {
@@ -901,7 +901,7 @@ provider "aws" {
 }
 
 resource "aws_vpc" "west" {
-  provider   = aws.us-west
+  provider   = aws.eu-west
   cidr_block = "10.0.0.0/16"
 }
 

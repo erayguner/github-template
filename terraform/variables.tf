@@ -49,7 +49,7 @@ variable "environment" {
 variable "aws_region" {
   description = "AWS region for resources"
   type        = string
-  default     = "us-west-2"
+  default     = "eu-west-2"
 
   validation {
     condition     = can(regex("^[a-z]{2}-[a-z]+-[0-9]$", var.aws_region))
@@ -72,7 +72,7 @@ variable "gcp_project_id" {
 variable "gcp_region" {
   description = "Google Cloud region for resources"
   type        = string
-  default     = "us-central1"
+  default     = "europe-west2"
 
   validation {
     condition     = can(regex("^[a-z]+-[a-z]+[0-9]$", var.gcp_region))
@@ -83,7 +83,7 @@ variable "gcp_region" {
 variable "gcp_zone" {
   description = "Google Cloud zone for resources"
   type        = string
-  default     = "us-central1-a"
+  default     = "europe-west2-a"
 
   validation {
     condition     = can(regex("^[a-z]+-[a-z]+[0-9]-[a-z]$", var.gcp_zone))

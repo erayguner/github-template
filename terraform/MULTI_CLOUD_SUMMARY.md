@@ -48,23 +48,23 @@ terraform/
 ```hcl
 enable_aws     = true
 enable_gcp     = false
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 project_name   = "myapp-dev"
 ```
 
-#### GCP Production Environment:  
+#### GCP Production Environment:
 ```hcl
 enable_aws     = false
 enable_gcp     = true
 gcp_project_id = "myapp-prod-12345"
-gcp_region     = "us-central1"
+gcp_region     = "europe-west2"
 ```
 
 #### Multi-Cloud Staging:
 ```hcl
 enable_aws     = true
 enable_gcp     = true
-aws_region     = "us-west-2"
+aws_region     = "eu-west-2"
 gcp_project_id = "myapp-staging-67890"
 ```
 
