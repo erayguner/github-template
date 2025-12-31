@@ -1,0 +1,139 @@
+name: Basic CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  # Linting and code quality
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Install uv
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        run: uv python install 3.11
+
+      - name: Python linting
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        working-directory: ./python
+        run: |
+          uv sync --group dev
+          uv run ruff check .
+          uv run ruff format --check .
+
+      - name: Setup Terraform
+        if: hashFiles('**/*.tf') != ''
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ~1.6.0
+
+      - name: Terraform linting
+        if: hashFiles('**/*.tf') != ''
+        run: |
+          terraform fmt -check -recursive
+          find . -name "*.tf" -execdir terraform init -backend=false \;
+          find . -name "*.tf" -execdir terraform validate \;
+
+  # Security checks
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0  # Fetch full git history for TruffleHog
+
+      - name: CodeQL Init
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/*.py') != ''
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: +security-extended
+
+      - name: CodeQL Autobuild
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/*.py') != ''
+        uses: github/codeql-action/autobuild@v3
+
+      - name: CodeQL Analyze
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/*.py') != ''
+        uses: github/codeql-action/analyze@v3
+
+      - name: Determine TruffleHog scan range
+        id: trufflehog-range
+        run: |
+          # Set base and head based on event type
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          # Check if base and head are the same or invalid
+          # Skip if: same commit, empty base, or null SHA (initial push)
+          if [[ "$BASE" == "$HEAD" ]] || \
+             [[ -z "$BASE" ]] || \
+             [[ "$BASE" == "0000000000000000000000000000000000000000" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "Skipping TruffleHog: base and head commits are identical or invalid"
+          else
+            {
+              echo "skip=false"
+              echo "base=$BASE"
+              echo "head=$HEAD"
+            } >> "$GITHUB_OUTPUT"
+            echo "TruffleHog will scan from $BASE to $HEAD"
+          fi
+
+      - name: Secret scanning with TruffleHog
+        if: steps.trufflehog-range.outputs.skip != 'true'
+        uses: trufflesecurity/trufflehog@v3.85.0
+        with:
+          path: ./
+          base: ${{ steps.trufflehog-range.outputs.base }}
+          head: ${{ steps.trufflehog-range.outputs.head }}
+
+      - name: Python security check
+        if: hashFiles('**/pyproject.toml', '**/requirements*.txt') != ''
+        run: |
+          pip install bandit safety
+          bandit -r python/ -f json -o bandit-report.json || true
+          safety check --json --output safety-report.json || true
+
+      - name: Create results directory
+        if: hashFiles('**/*.tf') != ''
+        run: mkdir -p results
+
+      - name: Install tfsec
+        if: hashFiles('**/*.tf') != ''
+        run: |
+          curl -sSL https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64 -o tfsec
+          chmod +x tfsec
+          sudo mv tfsec /usr/local/bin/
+
+      - name: Run tfsec security scan
+        if: hashFiles('**/*.tf') != ''
+        run: tfsec . --format sarif --out results/tfsec.sarif --soft-fail
+
+      - name: Upload tfsec SARIF to GitHub Security
+        if: hashFiles('**/*.tf') != '' && hashFiles('results/tfsec.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: results/tfsec.sarif
+          category: tfsec
