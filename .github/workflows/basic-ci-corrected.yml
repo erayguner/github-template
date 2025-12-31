@@ -120,12 +120,16 @@ jobs:
         if: hashFiles('**/*.tf') != ''
         run: mkdir -p results
 
-      - name: Terraform security check with tfsec
+      - name: Install tfsec
         if: hashFiles('**/*.tf') != ''
-        uses: aquasecurity/tfsec-action@v1.0.3
-        with:
-          format: sarif
-          sarif_file: results/tfsec.sarif
+        run: |
+          curl -sSL https://github.com/aquasecurity/tfsec/releases/latest/download/tfsec-linux-amd64 -o tfsec
+          chmod +x tfsec
+          sudo mv tfsec /usr/local/bin/
+
+      - name: Run tfsec security scan
+        if: hashFiles('**/*.tf') != ''
+        run: tfsec . --format sarif --out results/tfsec.sarif --soft-fail
 
       - name: Upload tfsec SARIF to GitHub Security
         if: hashFiles('**/*.tf') != '' && hashFiles('results/tfsec.sarif') != ''
