@@ -31,7 +31,6 @@ This directory contains Terraform infrastructure as code configurations.
 
 - **[TERRAFORM_GUIDE.md](./TERRAFORM_GUIDE.md)** - Complete Terraform guide with advanced usage
 - **[README-MultiCloud.md](./README-MultiCloud.md)** - Multi-cloud specific documentation
-- **[MULTI_CLOUD_SUMMARY.md](./MULTI_CLOUD_SUMMARY.md)** - Multi-cloud architecture summary
 
 ## 📁 Structure
 
@@ -49,7 +48,6 @@ terraform/
 ├── terraform.tfvars.example   # Example variable configuration
 ├── TERRAFORM_GUIDE.md         # Comprehensive usage guide
 ├── README-MultiCloud.md       # Multi-cloud documentation
-├── MULTI_CLOUD_SUMMARY.md     # Architecture summary
 └── README.md                  # This file
 ```
 

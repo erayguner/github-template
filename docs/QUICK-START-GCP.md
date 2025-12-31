@@ -218,9 +218,6 @@ gcloud projects get-iam-policy YOUR_PROJECT_ID \
 ```bash
 # Enable Cloud Build API
 gcloud services enable cloudbuild.googleapis.com --project=YOUR_PROJECT_ID
-
-# See Cloud Build integration guide
-cat docs/CLOUD-BUILD.md
 ```
 
 ### Multiple Environments
@@ -306,8 +303,9 @@ gcloud billing budgets create \
 
 ### Documentation
 - [Full GCP Setup Guide](GCP-SETUP.md)
-- [Cloud Build Integration](CLOUD-BUILD.md)
+- [Template Usage](TEMPLATE-USAGE.md)
 - [Multi-Cloud Setup](multi-cloud.md)
+- [CI/CD Architecture](ci-architecture.md)
 
 ### External Links
 - [GCP Free Tier](https://cloud.google.com/free)
