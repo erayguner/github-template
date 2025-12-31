@@ -469,7 +469,8 @@ fi
 
 echo "Documentation:"
 echo "  - GCP Setup Guide: docs/GCP-SETUP.md"
-echo "  - Cloud Build Integration: docs/CLOUD-BUILD.md"
+echo "  - Template Usage: docs/TEMPLATE-USAGE.md"
+echo "  - CI/CD Architecture: docs/ci-architecture.md"
 echo ""
 
 print_success "Setup completed successfully!"

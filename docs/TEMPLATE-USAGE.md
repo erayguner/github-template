@@ -360,5 +360,6 @@ gcloud iam workload-identity-pools describe github-pool \
 
 - [GCP Quick Start](QUICK-START-GCP.md) - 5-minute setup guide
 - [Full GCP Setup](GCP-SETUP.md) - Comprehensive documentation
-- [Cloud Build](CLOUD-BUILD.md) - CI/CD deployment guide
+- [CI/CD Architecture](ci-architecture.md) - Pipeline documentation
+- [Multi-Cloud Setup](multi-cloud.md) - AWS + GCP hybrid deployments
 - [Issues](https://github.com/erayguner/github-template/issues) - Report bugs or request features

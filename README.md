@@ -202,7 +202,6 @@ make validate-all
 │   │   ├── auto-fix.yml           # Claude AI auto-fix for CI failures
 │   │   └── cloud-build-deploy.yml # GCP Cloud Build deployment
 │   ├── ISSUE_TEMPLATE/            # Bug & feature request templates
-│   ├── SETUP.md                   # Auto-fix setup guide
 │   └── PULL_REQUEST_TEMPLATE.md   # PR template
 ├── terraform/
 │   ├── main.tf                    # Providers & locals
@@ -222,9 +221,9 @@ make validate-all
 ├── docs/
 │   ├── QUICK-START-GCP.md         # 5-minute GCP setup
 │   ├── GCP-SETUP.md               # Comprehensive GCP guide
-│   ├── CLOUD-BUILD.md             # Cloud Build integration
 │   ├── TEMPLATE-USAGE.md          # How to customize this template
-│   └── multi-cloud.md             # AWS + GCP hybrid setup
+│   ├── multi-cloud.md             # AWS + GCP hybrid setup
+│   └── ci-architecture.md         # CI/CD pipeline architecture
 ├── cloudbuild.yaml                # GCP Cloud Build configuration
 ├── Dockerfile                     # Multi-stage Python container
 ├── Makefile                       # Development commands
@@ -241,7 +240,7 @@ make validate-all
 |----------|-------------|
 | [Quick Start (5 min)](docs/QUICK-START-GCP.md) | Get your first deployment running |
 | [Full GCP Setup](docs/GCP-SETUP.md) | Comprehensive GCP configuration guide |
-| [Cloud Build](docs/CLOUD-BUILD.md) | Cloud Build integration and deployment |
+| [CI/CD Architecture](docs/ci-architecture.md) | Modular pipeline architecture |
 | [API Reference](docs/GCP-APIS-REFERENCE.md) | Required GCP APIs and permissions |
 | [Multi-Cloud](docs/multi-cloud.md) | AWS + GCP hybrid deployments |
 | [Template Usage](docs/TEMPLATE-USAGE.md) | How to customize this template |
