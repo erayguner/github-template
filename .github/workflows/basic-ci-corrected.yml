@@ -90,12 +90,14 @@ jobs:
           if [[ "$BASE" == "$HEAD" ]] || \
              [[ -z "$BASE" ]] || \
              [[ "$BASE" == "0000000000000000000000000000000000000000" ]]; then
-            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "Skipping TruffleHog: base and head commits are identical or invalid"
           else
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "base=$BASE" >> $GITHUB_OUTPUT
-            echo "head=$HEAD" >> $GITHUB_OUTPUT
+            {
+              echo "skip=false"
+              echo "base=$BASE"
+              echo "head=$HEAD"
+            } >> "$GITHUB_OUTPUT"
             echo "TruffleHog will scan from $BASE to $HEAD"
           fi
 
