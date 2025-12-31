@@ -1,0 +1,88 @@
+name: Setup Repository Labels
+
+on:
+  workflow_dispatch: # Manual trigger
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - '.github/dependabot.yml'
+      - '.github/workflows/setup-labels.yml'
+
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  setup-labels:
+    name: Create Repository Labels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create Dependabot Labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Creating missing Dependabot labels..."
+
+          # Create 'dependencies' label (orange color for dependency updates)
+          gh label create "dependencies" \
+            --description "Pull requests that update a dependency file" \
+            --color "0366d6" \
+            --force || echo "'dependencies' label already exists"
+
+          # Create 'github-actions' label (purple color for GitHub Actions)
+          gh label create "github-actions" \
+            --description "Pull requests that update GitHub Actions code" \
+            --color "5319e7" \
+            --force || echo "'github-actions' label already exists"
+
+          # Create 'ci-cd' label (blue color for CI/CD)
+          gh label create "ci-cd" \
+            --description "Continuous integration and deployment" \
+            --color "1d76db" \
+            --force || echo "'ci-cd' label already exists"
+
+          # Create 'security' label (red color for security)
+          gh label create "security" \
+            --description "Security-related updates and fixes" \
+            --color "d73a4a" \
+            --force || echo "'security' label already exists"
+
+          # Create additional labels used in dependabot.yml
+          gh label create "npm" \
+            --description "JavaScript dependencies" \
+            --color "cb3837" \
+            --force || echo "'npm' label already exists"
+
+          gh label create "python" \
+            --description "Python dependencies" \
+            --color "3776ab" \
+            --force || echo "'python' label already exists"
+
+          gh label create "terraform" \
+            --description "Terraform dependencies" \
+            --color "7B42BC" \
+            --force || echo "'terraform' label already exists"
+
+          gh label create "infrastructure" \
+            --description "Infrastructure as Code" \
+            --color "006b75" \
+            --force || echo "'infrastructure' label already exists"
+
+          gh label create "docker" \
+            --description "Docker dependencies" \
+            --color "2496ed" \
+            --force || echo "'docker' label already exists"
+
+          echo ""
+          echo "✓ Label setup complete!"
+
+      - name: List all labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh label list
