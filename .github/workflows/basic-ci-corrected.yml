@@ -103,7 +103,7 @@ jobs:
 
       - name: Secret scanning with TruffleHog
         if: steps.trufflehog-range.outputs.skip != 'true'
-        uses: trufflesecurity/trufflehog@v3.85.0
+        uses: trufflesecurity/trufflehog@v3.92.4
         with:
           path: ./
           base: ${{ steps.trufflehog-range.outputs.base }}
